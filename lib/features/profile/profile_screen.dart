@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/profile/profile_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 
@@ -17,7 +17,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _nameCtrl = TextEditingController(text: 'Андрей');
+  final _nameCtrl = TextEditingController();
   final _surnameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -66,18 +66,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final prefs = await SharedPreferences.getInstance();
+    await ProfileStore.instance.load();
     if (!mounted) return;
+    final data = ProfileStore.instance.data;
     setState(() {
-      _nameCtrl.text = prefs.getString('profile_name') ?? _nameCtrl.text;
-      _surnameCtrl.text = prefs.getString('profile_surname') ?? '';
-      _phoneCtrl.text = prefs.getString('profile_phone') ?? '';
-      _emailCtrl.text = prefs.getString('profile_email') ?? '';
-      _birthdateCtrl.text = prefs.getString('profile_birthdate') ?? '';
-      _promoCtrl.text = prefs.getString('profile_promo') ?? '';
-      final genderRaw = prefs.getString('profile_gender');
-      if (genderRaw == 'male') _gender = _Gender.male;
-      if (genderRaw == 'female') _gender = _Gender.female;
+      _nameCtrl.text = data.name;
+      _surnameCtrl.text = data.surname;
+      _phoneCtrl.text = data.phone;
+      _emailCtrl.text = data.email;
+      _birthdateCtrl.text = data.birthdate;
+      _promoCtrl.text = data.promo;
+      if (data.gender == 'male') _gender = _Gender.male;
+      if (data.gender == 'female') _gender = _Gender.female;
     });
   }
 
@@ -100,16 +100,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _saving = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('profile_name', _nameCtrl.text.trim());
-      await prefs.setString('profile_surname', _surnameCtrl.text.trim());
-      await prefs.setString('profile_phone', _phoneCtrl.text.trim());
-      await prefs.setString('profile_email', _emailCtrl.text.trim());
-      await prefs.setString('profile_birthdate', _birthdateCtrl.text.trim());
-      await prefs.setString('profile_promo', _promoCtrl.text.trim());
-      await prefs.setString(
-        'profile_gender',
-        _gender == _Gender.male ? 'male' : 'female',
+      await ProfileStore.instance.save(
+        ProfileData(
+          name: _nameCtrl.text.trim(),
+          surname: _surnameCtrl.text.trim(),
+          phone: _phoneCtrl.text.trim(),
+          email: _emailCtrl.text.trim(),
+          birthdate: _birthdateCtrl.text.trim(),
+          promo: _promoCtrl.text.trim(),
+          gender: _gender == _Gender.male ? 'male' : 'female',
+        ),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

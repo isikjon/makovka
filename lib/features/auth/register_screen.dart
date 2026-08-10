@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/profile/profile_store.dart';
 import '../../core/theme/app_theme.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -65,6 +66,12 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   void _submit() {
     if (!_canSubmit) return;
+    ProfileStore.instance.save(
+      ProfileStore.instance.data.copyWith(
+        name: _nameCtrl.text.trim(),
+        promo: _showPromo ? _promoCtrl.text.trim() : null,
+      ),
+    );
     context.go('/home');
   }
 
@@ -79,178 +86,143 @@ class _RegisterScreenState extends State<RegisterScreen>
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => FocusScope.of(context).unfocus(),
-        child: SizedBox.expand(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child: SvgPicture.asset(
-                  'assets/images/auth_phone_bg.svg',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: SvgPicture.asset(
+                'assets/images/auth_phone_bg.svg',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
               ),
-
-                // Step chip
-                Positioned(
-                  top: 44 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: _StepChip(text: 'Шаг 2 из 2', scale: s),
-                  ),
-                ),
-
-                // Title on orange
-                Positioned(
-                  top: 108 * s,
-                  left: 0,
-                  right: 0,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: Text(
-                        'Как вас зовут?',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.h1().copyWith(
-                          fontSize: 24 * s,
-                          height: 30 / 24,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+            ),
+            SafeArea(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: 24 * s),
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: SlideTransition(
+                    position: _slideUp,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: 20 * s),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _StepChip(text: 'Шаг 2 из 2', scale: s),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Subtitle
-                Positioned(
-                  top: 236 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: Text(
-                        'Осталась пара деталей, чтобы начать\nполучать вкусные бонусы.',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.body().copyWith(
-                          fontSize: 14 * s,
-                          height: 20 / 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Form
-                Positioned(
-                  top: 300 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _FieldLabel(text: 'Имя', required: true, scale: s),
-                          SizedBox(height: 8 * s),
-                          _TextInput(
-                            controller: _nameCtrl,
-                            focusNode: _nameFocus,
-                            hint: 'Текст',
-                            scale: s,
+                        SizedBox(height: 36 * s),
+                        Text(
+                          'Как вас зовут?',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.h1().copyWith(
+                            fontSize: 24 * s,
+                            height: 30 / 24,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
                           ),
-                          SizedBox(height: 20 * s),
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 320),
-                            curve: Curves.easeOutCubic,
-                            alignment: Alignment.topCenter,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 280),
-                              switchInCurve: Curves.easeOut,
-                              switchOutCurve: Curves.easeIn,
-                              transitionBuilder: (child, anim) =>
-                                  FadeTransition(opacity: anim, child: child),
-                              child: _showPromo
-                                  ? Column(
-                                      key: const ValueKey('promo-field'),
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _FieldLabel(
-                                          text: 'Промокод друга',
-                                          required: false,
-                                          scale: s,
-                                        ),
-                                        SizedBox(height: 8 * s),
-                                        _TextInput(
-                                          controller: _promoCtrl,
-                                          focusNode: _promoFocus,
-                                          hint: 'Введите код на 200 баллов',
-                                          scale: s,
-                                        ),
-                                      ],
-                                    )
-                                  : GestureDetector(
-                                      key: const ValueKey('promo-link'),
-                                      behavior: HitTestBehavior.opaque,
-                                      onTap: _togglePromo,
-                                      child: Row(
+                        ),
+                        SizedBox(height: 24 * s),
+                        Text(
+                          'Осталась пара деталей, чтобы начать\nполучать вкусные бонусы.',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.body().copyWith(
+                            fontSize: 14 * s,
+                            height: 20 / 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 40 * s),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _FieldLabel(text: 'Имя', required: true, scale: s),
+                            SizedBox(height: 8 * s),
+                            _TextInput(
+                              controller: _nameCtrl,
+                              focusNode: _nameFocus,
+                              hint: 'Текст',
+                              scale: s,
+                            ),
+                            SizedBox(height: 20 * s),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 320),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 280),
+                                switchInCurve: Curves.easeOut,
+                                switchOutCurve: Curves.easeIn,
+                                transitionBuilder: (child, anim) =>
+                                    FadeTransition(opacity: anim, child: child),
+                                child: _showPromo
+                                    ? Column(
+                                        key: const ValueKey('promo-field'),
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            '✨ ',
-                                            style: TextStyle(
-                                              fontSize: 14 * s,
-                                            ),
+                                          _FieldLabel(
+                                            text: 'Промокод друга',
+                                            required: false,
+                                            scale: s,
                                           ),
-                                          Text(
-                                            'У меня есть промокод друга',
-                                            style: AppTextStyles.body().copyWith(
-                                              fontSize: 14 * s,
-                                              height: 20 / 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: AppColors.textPrimary,
-                                              decoration:
-                                                  TextDecoration.underline,
-                                              decorationColor:
-                                                  AppColors.textPrimary,
-                                            ),
+                                          SizedBox(height: 8 * s),
+                                          _TextInput(
+                                            controller: _promoCtrl,
+                                            focusNode: _promoFocus,
+                                            hint: 'Введите код на 200 баллов',
+                                            scale: s,
                                           ),
                                         ],
+                                      )
+                                    : GestureDetector(
+                                        key: const ValueKey('promo-link'),
+                                        behavior: HitTestBehavior.opaque,
+                                        onTap: _togglePromo,
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              '✨ ',
+                                              style: TextStyle(
+                                                fontSize: 14 * s,
+                                              ),
+                                            ),
+                                            Text(
+                                              'У меня есть промокод друга',
+                                              style: AppTextStyles.body().copyWith(
+                                                fontSize: 14 * s,
+                                                height: 20 / 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: AppColors.textPrimary,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                                decorationColor:
+                                                    AppColors.textPrimary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                        SizedBox(height: 32 * s),
+                        _SubmitButton(
+                          enabled: _canSubmit,
+                          onTap: _submit,
+                          scale: s,
+                        ),
+                        SizedBox(height: 32 * s),
+                      ],
                     ),
                   ),
                 ),
-
-                // Submit button
-                Positioned(
-                  bottom: 40 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: _SubmitButton(
-                      enabled: _canSubmit,
-                      onTap: _submit,
-                      scale: s,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
+      ),
     );
   }
 }

@@ -57,3 +57,6 @@ app.*.map.json
 
 # Editor/tooling
 .claude/
+
+# Separate repo, own git history
+/backend/

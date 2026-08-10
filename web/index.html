@@ -18,11 +18,13 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#FF9A00">
   <meta name="description" content="Маковка — приложение лояльности пекарни.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Маковка">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -32,6 +34,52 @@
 
   <title>Маковка</title>
   <link rel="manifest" href="manifest.json">
+
+  <script>
+    // Captures the browser's native "install this app" prompt as early as
+    // possible (before Flutter even starts loading) so the in-app install
+    // button can trigger it later — Chrome only fires this event once, and
+    // only if nothing has called preventDefault() + held onto it.
+    (function () {
+      window.__pwaDeferredPrompt = null;
+
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        window.__pwaDeferredPrompt = event;
+      });
+
+      window.addEventListener('appinstalled', function () {
+        window.__pwaDeferredPrompt = null;
+      });
+
+      window.pwaIsInstallAvailable = function () {
+        return window.__pwaDeferredPrompt !== null;
+      };
+
+      window.pwaPromptInstall = async function () {
+        var promptEvent = window.__pwaDeferredPrompt;
+        if (!promptEvent) {
+          return 'unavailable';
+        }
+        promptEvent.prompt();
+        var choice = await promptEvent.userChoice;
+        window.__pwaDeferredPrompt = null;
+        return choice.outcome;
+      };
+
+      window.pwaIsStandalone = function () {
+        return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+          window.navigator.standalone === true;
+      };
+
+      window.pwaIsIOS = function () {
+        var ua = window.navigator.userAgent || '';
+        var isIOSDevice = /iPad|iPhone|iPod/.test(ua);
+        var isIPadOS13Plus = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        return isIOSDevice || isIPadOS13Plus;
+      };
+    })();
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

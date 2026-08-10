@@ -110,144 +110,100 @@ class _OtpScreenState extends State<OtpScreen>
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => FocusScope.of(context).unfocus(),
-        child: SizedBox.expand(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child: SvgPicture.asset(
-                  'assets/images/auth_phone_bg.svg',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: SvgPicture.asset(
+                'assets/images/auth_phone_bg.svg',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
+            ),
+            SafeArea(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: 24 * s),
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: SlideTransition(
+                    position: _slideUp,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: 20 * s),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _StepChip(text: 'Шаг 1 из 2', scale: s),
+                        ),
+                        SizedBox(height: 36 * s),
+                        Text(
+                          'Вход в систему',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.h1().copyWith(
+                            fontSize: 24 * s,
+                            height: 30 / 24,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 24 * s),
+                        Text(
+                          'Введите код из SMS',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.body().copyWith(
+                            fontSize: 14 * s,
+                            height: 20 / 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 40 * s),
+                        _CodeField(
+                          controller: _codeCtrl,
+                          focusNode: _codeFocus,
+                          length: _codeLen,
+                          scale: s,
+                        ),
+                        SizedBox(height: 24 * s),
+                        _ResendButton(
+                          enabled: canResend,
+                          onTap: _resend,
+                          scale: s,
+                        ),
+                        SizedBox(height: 24 * s),
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Получить новый код: ',
+                                style: AppTextStyles.body().copyWith(
+                                  fontSize: 14 * s,
+                                  height: 20 / 14,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              Text(
+                                _fmtTimer(),
+                                style: AppTextStyles.body().copyWith(
+                                  fontSize: 14 * s,
+                                  height: 20 / 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 32 * s),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-
-                // Step chip
-                Positioned(
-                  top: 44 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: _StepChip(text: 'Шаг 1 из 2', scale: s),
-                  ),
-                ),
-
-                // Title on orange
-                Positioned(
-                  top: 108 * s,
-                  left: 0,
-                  right: 0,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: Text(
-                        'Вход в систему',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.h1().copyWith(
-                          fontSize: 24 * s,
-                          height: 30 / 24,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Subtitle
-                Positioned(
-                  top: 236 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: Text(
-                        'Введите код из SMS',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.body().copyWith(
-                          fontSize: 14 * s,
-                          height: 20 / 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Code field
-                Positioned(
-                  top: 284 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: _CodeField(
-                        controller: _codeCtrl,
-                        focusNode: _codeFocus,
-                        length: _codeLen,
-                        scale: s,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Resend button
-                Positioned(
-                  top: 372 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: _ResendButton(
-                      enabled: canResend,
-                      onTap: _resend,
-                      scale: s,
-                    ),
-                  ),
-                ),
-
-                // Countdown
-                Positioned(
-                  top: 448 * s,
-                  left: 0,
-                  right: 0,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Получить новый код: ',
-                            style: AppTextStyles.body().copyWith(
-                              fontSize: 14 * s,
-                              height: 20 / 14,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          Text(
-                            _fmtTimer(),
-                            style: AppTextStyles.body().copyWith(
-                              fontSize: 14 * s,
-                              height: 20 / 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ),
-          ),
+          ],
         ),
+      ),
     );
   }
 }

@@ -507,8 +507,11 @@ class _MapContent extends StatelessWidget {
       ),
       children: [
         TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          urlTemplate:
+              'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+          subdomains: const ['a', 'b', 'c', 'd'],
           userAgentPackageName: 'com.makovka.makovkaapp',
+          maxNativeZoom: 20,
         ),
         MarkerLayer(
           markers: [
@@ -580,6 +583,7 @@ class _BakeryInfoCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         width: double.infinity,
+        constraints: const BoxConstraints(maxHeight: 100),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),

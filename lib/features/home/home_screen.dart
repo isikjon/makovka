@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/profile/profile_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../shared/widgets/promo_cards.dart';
@@ -51,13 +52,16 @@ class _HomeScreenState extends State<HomeScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  _HeroBlock(
-                    userName: 'Андрей',
-                    discountLabel: 'Скидка 10%',
-                    savedAmount: '250 ₽',
-                    onMenu: () => Scaffold.of(context).openDrawer(),
-                    onLocation: () => context.push('/locations'),
-                    onInfo: () => context.push('/loyalty'),
+                  AnimatedBuilder(
+                    animation: ProfileStore.instance,
+                    builder: (context, _) => _HeroBlock(
+                      userName: ProfileStore.instance.displayName,
+                      discountLabel: 'Скидка 10%',
+                      savedAmount: '250 ₽',
+                      onMenu: () => Scaffold.of(context).openDrawer(),
+                      onLocation: () => context.push('/locations'),
+                      onInfo: () => context.push('/loyalty'),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Padding(

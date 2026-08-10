@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import '../../core/profile/profile_store.dart';
 import '../../core/theme/app_theme.dart';
 
 class PhoneAuthScreen extends StatefulWidget {
@@ -59,6 +60,9 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen>
 
   void _submit() {
     if (!_canProceed) return;
+    ProfileStore.instance.save(
+      ProfileStore.instance.data.copyWith(phone: _phoneCtrl.text.trim()),
+    );
     context.go('/auth/otp');
   }
 
@@ -73,185 +77,131 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen>
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => FocusScope.of(context).unfocus(),
-        child: SizedBox.expand(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // Orange gradient bg (top blob), fills entire screen
-              Positioned.fill(
-                child: SvgPicture.asset(
-                  'assets/images/auth_phone_bg.svg',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: SvgPicture.asset(
+                'assets/images/auth_phone_bg.svg',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
+            ),
+            SafeArea(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: 24 * s),
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: SlideTransition(
+                    position: _slideUp,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: 20 * s),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _StepChip(text: 'Шаг 1 из 2', scale: s),
+                        ),
+                        SizedBox(height: 36 * s),
+                        Text(
+                          'Вход в систему',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.h1().copyWith(
+                            fontSize: 24 * s,
+                            height: 30 / 24,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 24 * s),
+                        Text(
+                          'Введите свой номер телефона для\nвхода/регистрации',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.body().copyWith(
+                            fontSize: 14 * s,
+                            height: 20 / 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 40 * s),
+                        _PhoneField(
+                          controller: _phoneCtrl,
+                          focusNode: _phoneFocus,
+                          mask: _mask,
+                          scale: s,
+                        ),
+                        SizedBox(height: 20 * s),
+                        _AgreementRow(
+                          checked: _agreedTerms,
+                          scale: s,
+                          onToggle: () =>
+                              setState(() => _agreedTerms = !_agreedTerms),
+                          textSpans: [
+                            TextSpan(
+                              text: 'При входе/регистрации вы принимаете\nусловия ',
+                              style: AppTextStyles.body().copyWith(
+                                fontSize: 12 * s,
+                                height: 16 / 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            TextSpan(
+                              text: 'пользовательского соглашения',
+                              style: AppTextStyles.body().copyWith(
+                                fontSize: 12 * s,
+                                height: 16 / 12,
+                                color: AppColors.textSecondary,
+                                decoration: TextDecoration.underline,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () => context.push('/legal/privacy'),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 12 * s),
+                        _AgreementRow(
+                          checked: _agreedPrivacy,
+                          scale: s,
+                          onToggle: () =>
+                              setState(() => _agreedPrivacy = !_agreedPrivacy),
+                          textSpans: [
+                            TextSpan(
+                              text: 'Согласны с ',
+                              style: AppTextStyles.body().copyWith(
+                                fontSize: 12 * s,
+                                height: 16 / 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            TextSpan(
+                              text: 'политикой конфиденциальности',
+                              style: AppTextStyles.body().copyWith(
+                                fontSize: 12 * s,
+                                height: 16 / 12,
+                                color: AppColors.textSecondary,
+                                decoration: TextDecoration.underline,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () => context.push('/legal/privacy'),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 32 * s),
+                        _ContinueButton(
+                          enabled: _canProceed,
+                          onTap: _submit,
+                          scale: s,
+                        ),
+                        SizedBox(height: 32 * s),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-
-                // Step chip top-right
-                Positioned(
-                  top: 44 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: _StepChip(text: 'Шаг 1 из 2', scale: s),
-                  ),
-                ),
-
-                // "Вход в систему" title on orange
-                Positioned(
-                  top: 108 * s,
-                  left: 0,
-                  right: 0,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: Text(
-                        'Вход в систему',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.h1().copyWith(
-                          fontSize: 24 * s,
-                          height: 30 / 24,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Subtitle
-                Positioned(
-                  top: 236 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: Text(
-                        'Введите свой номер телефона для\nвхода/регистрации',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.body().copyWith(
-                          fontSize: 14 * s,
-                          height: 20 / 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Phone input
-                Positioned(
-                  top: 300 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: _PhoneField(
-                        controller: _phoneCtrl,
-                        focusNode: _phoneFocus,
-                        mask: _mask,
-                        scale: s,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Checkbox: terms
-                Positioned(
-                  top: 384 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: _AgreementRow(
-                      checked: _agreedTerms,
-                      scale: s,
-                      onToggle: () =>
-                          setState(() => _agreedTerms = !_agreedTerms),
-                      textSpans: [
-                        TextSpan(
-                          text: 'При входе/регистрации вы принимаете\nусловия ',
-                          style: AppTextStyles.body().copyWith(
-                            fontSize: 12 * s,
-                            height: 16 / 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        TextSpan(
-                          text: 'пользовательского соглашения',
-                          style: AppTextStyles.body().copyWith(
-                            fontSize: 12 * s,
-                            height: 16 / 12,
-                            color: AppColors.textSecondary,
-                            decoration: TextDecoration.underline,
-                          ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () => context.push('/legal/privacy'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Checkbox: privacy
-                Positioned(
-                  top: 448 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: _AgreementRow(
-                      checked: _agreedPrivacy,
-                      scale: s,
-                      onToggle: () =>
-                          setState(() => _agreedPrivacy = !_agreedPrivacy),
-                      textSpans: [
-                        TextSpan(
-                          text: 'Согласны с ',
-                          style: AppTextStyles.body().copyWith(
-                            fontSize: 12 * s,
-                            height: 16 / 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        TextSpan(
-                          text: 'политикой конфиденциальности',
-                          style: AppTextStyles.body().copyWith(
-                            fontSize: 12 * s,
-                            height: 16 / 12,
-                            color: AppColors.textSecondary,
-                            decoration: TextDecoration.underline,
-                          ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () => context.push('/legal/privacy'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Далее button
-                Positioned(
-                  bottom: 40 * s,
-                  left: 24 * s,
-                  right: 24 * s,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: _ContinueButton(
-                      enabled: _canProceed,
-                      onTap: _submit,
-                      scale: s,
-                    ),
-                  ),
-                ),
-              ],
             ),
-          ),
+          ],
         ),
+      ),
     );
   }
 }

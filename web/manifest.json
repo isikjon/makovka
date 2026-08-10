@@ -2,6 +2,7 @@
     "name": "Маковка",
     "short_name": "Маковка",
     "start_url": ".",
+    "scope": ".",
     "display": "standalone",
     "background_color": "#FAF9F9",
     "theme_color": "#FF9A00",
