@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/auth_store.dart';
 import '../../core/profile/profile_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
@@ -79,6 +81,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (data.gender == 'male') _gender = _Gender.male;
       if (data.gender == 'female') _gender = _Gender.female;
     });
+
+    if (!AuthStore.instance.isAuthenticated) return;
+    try {
+      final remote = await ApiClient.instance.get('/profile');
+      if (!mounted) return;
+      setState(() {
+        _nameCtrl.text = remote['name'] as String? ?? _nameCtrl.text;
+        _surnameCtrl.text = remote['surname'] as String? ?? _surnameCtrl.text;
+        _phoneCtrl.text = remote['phone'] as String? ?? _phoneCtrl.text;
+        _emailCtrl.text = remote['email'] as String? ?? _emailCtrl.text;
+        _birthdateCtrl.text =
+            remote['birthdate'] as String? ?? _birthdateCtrl.text;
+        _promoCtrl.text = remote['promo_code'] as String? ?? _promoCtrl.text;
+        final gender = remote['gender'] as String?;
+        if (gender == 'male') _gender = _Gender.male;
+        if (gender == 'female') _gender = _Gender.female;
+      });
+      await ProfileStore.instance.save(
+        ProfileData(
+          name: _nameCtrl.text,
+          surname: _surnameCtrl.text,
+          phone: _phoneCtrl.text,
+          email: _emailCtrl.text,
+          birthdate: _birthdateCtrl.text,
+          promo: _promoCtrl.text,
+          gender: _gender == _Gender.male ? 'male' : 'female',
+        ),
+      );
+    } on ApiException catch (_) {
+      // Backend unreachable — keep showing the locally cached profile.
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -98,24 +131,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    final profile = ProfileData(
+      name: _nameCtrl.text.trim(),
+      surname: _surnameCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim(),
+      email: _emailCtrl.text.trim(),
+      birthdate: _birthdateCtrl.text.trim(),
+      promo: _promoCtrl.text.trim(),
+      gender: _gender == _Gender.male ? 'male' : 'female',
+    );
+
     setState(() => _saving = true);
     try {
-      await ProfileStore.instance.save(
-        ProfileData(
-          name: _nameCtrl.text.trim(),
-          surname: _surnameCtrl.text.trim(),
-          phone: _phoneCtrl.text.trim(),
-          email: _emailCtrl.text.trim(),
-          birthdate: _birthdateCtrl.text.trim(),
-          promo: _promoCtrl.text.trim(),
-          gender: _gender == _Gender.male ? 'male' : 'female',
-        ),
-      );
+      if (AuthStore.instance.isAuthenticated) {
+        await ApiClient.instance.put(
+          '/profile',
+          body: {
+            'name': profile.name,
+            'surname': profile.surname,
+            'email': profile.email,
+            'birthdate': profile.birthdate,
+            'gender': profile.gender,
+            'promo_code': profile.promo,
+          },
+        );
+      }
+      await ProfileStore.instance.save(profile);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Профиль сохранён'),
           backgroundColor: AppColors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: const Color(0xFFE05656),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -131,6 +186,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context) => const _LogoutDialog(),
     );
     if (confirmed == true && mounted) {
+      await AuthStore.instance.clear();
+      if (!mounted) return;
       context.go('/');
     }
   }

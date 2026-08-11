@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import '../../core/api/api_client.dart';
 import '../../core/profile/profile_store.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -27,6 +28,8 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen>
 
   bool _agreedTerms = false;
   bool _agreedPrivacy = false;
+  bool _submitting = false;
+  String? _error;
 
   late final AnimationController _enter;
   late final Animation<double> _fade;
@@ -58,12 +61,30 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen>
     super.dispose();
   }
 
-  void _submit() {
-    if (!_canProceed) return;
-    ProfileStore.instance.save(
-      ProfileStore.instance.data.copyWith(phone: _phoneCtrl.text.trim()),
-    );
-    context.go('/auth/otp');
+  Future<void> _submit() async {
+    if (!_canProceed || _submitting) return;
+    final phone = '+7${_mask.getUnmaskedText()}';
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await ApiClient.instance.post(
+        '/auth/otp/request',
+        body: {'phone': phone},
+        auth: false,
+      );
+      ProfileStore.instance.save(
+        ProfileStore.instance.data.copyWith(phone: phone),
+      );
+      if (!mounted) return;
+      context.go('/auth/otp', extra: phone);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -186,9 +207,21 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen>
                             ),
                           ],
                         ),
+                        if (_error != null) ...[
+                          SizedBox(height: 12 * s),
+                          Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.body().copyWith(
+                              fontSize: 13 * s,
+                              color: const Color(0xFFE05656),
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 32 * s),
                         _ContinueButton(
-                          enabled: _canProceed,
+                          enabled: _canProceed && !_submitting,
+                          loading: _submitting,
                           onTap: _submit,
                           scale: s,
                         ),
@@ -365,11 +398,13 @@ class _AnimatedCheckbox extends StatelessWidget {
 
 class _ContinueButton extends StatefulWidget {
   final bool enabled;
+  final bool loading;
   final VoidCallback onTap;
   final double scale;
 
   const _ContinueButton({
     required this.enabled,
+    this.loading = false,
     required this.onTap,
     required this.scale,
   });
@@ -413,13 +448,22 @@ class _ContinueButtonState extends State<_ContinueButton> {
                 : null,
           ),
           alignment: Alignment.center,
-          child: Text(
-            'Далее',
-            style: AppTextStyles.button().copyWith(
-              fontSize: 18 * s,
-              color: enabled ? Colors.white : const Color(0xFFF3F1EF),
-            ),
-          ),
+          child: widget.loading
+              ? SizedBox(
+                  width: 22 * s,
+                  height: 22 * s,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                  ),
+                )
+              : Text(
+                  'Далее',
+                  style: AppTextStyles.button().copyWith(
+                    fontSize: 18 * s,
+                    color: enabled ? Colors.white : const Color(0xFFF3F1EF),
+                  ),
+                ),
         ),
       ),
     );

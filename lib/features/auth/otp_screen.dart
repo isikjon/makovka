@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/auth_store.dart';
 import '../../core/theme/app_theme.dart';
 
 class OtpScreen extends StatefulWidget {
-  const OtpScreen({super.key});
+  final String phone;
+  const OtpScreen({super.key, required this.phone});
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -23,6 +26,8 @@ class _OtpScreenState extends State<OtpScreen>
 
   Timer? _timer;
   int _secondsLeft = _resendSeconds;
+  bool _verifying = false;
+  String? _error;
 
   late final AnimationController _enter;
   late final Animation<double> _fade;
@@ -70,15 +75,50 @@ class _OtpScreenState extends State<OtpScreen>
   }
 
   Future<void> _verify() async {
+    if (_verifying) return;
     FocusScope.of(context).unfocus();
-    await Future.delayed(const Duration(milliseconds: 250));
-    if (!mounted) return;
-    context.go('/auth/register');
+    setState(() {
+      _verifying = true;
+      _error = null;
+    });
+    try {
+      final data = await ApiClient.instance.post(
+        '/auth/otp/verify',
+        body: {'phone': widget.phone, 'code': _codeCtrl.text},
+        auth: false,
+      );
+      await AuthStore.instance.setTokens(
+        accessToken: data['access_token'] as String,
+        refreshToken: data['refresh_token'] as String,
+      );
+      if (!mounted) return;
+      context.go('/auth/register');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _codeCtrl.clear();
+      });
+      _codeFocus.requestFocus();
+    } finally {
+      if (mounted) setState(() => _verifying = false);
+    }
   }
 
-  void _resend() {
+  Future<void> _resend() async {
     if (_secondsLeft > 0) return;
     _codeCtrl.clear();
+    setState(() => _error = null);
+    try {
+      await ApiClient.instance.post(
+        '/auth/otp/request',
+        body: {'phone': widget.phone},
+        auth: false,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    }
     _startTimer();
     _codeFocus.requestFocus();
   }
@@ -163,6 +203,32 @@ class _OtpScreenState extends State<OtpScreen>
                           length: _codeLen,
                           scale: s,
                         ),
+                        if (_verifying) ...[
+                          SizedBox(height: 16 * s),
+                          Center(
+                            child: SizedBox(
+                              width: 22 * s,
+                              height: 22 * s,
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                valueColor: AlwaysStoppedAnimation(
+                                  AppColors.orange,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (_error != null) ...[
+                          SizedBox(height: 16 * s),
+                          Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.body().copyWith(
+                              fontSize: 13 * s,
+                              color: const Color(0xFFE05656),
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 24 * s),
                         _ResendButton(
                           enabled: canResend,

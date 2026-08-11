@@ -67,8 +67,10 @@ class AppRouter {
       ),
       GoRoute(
         path: '/auth/otp',
-        pageBuilder: (context, state) =>
-            _fadeThroughPage(state, const OtpScreen()),
+        pageBuilder: (context, state) => _fadeThroughPage(
+          state,
+          OtpScreen(phone: state.extra as String? ?? ''),
+        ),
       ),
       GoRoute(
         path: '/auth/register',

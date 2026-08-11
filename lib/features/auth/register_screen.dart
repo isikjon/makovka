@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api/api_client.dart';
 import '../../core/profile/profile_store.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -21,6 +22,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _promoFocus = FocusNode();
 
   bool _showPromo = false;
+  bool _submitting = false;
+  String? _error;
 
   late final AnimationController _enter;
   late final Animation<double> _fade;
@@ -64,15 +67,33 @@ class _RegisterScreenState extends State<RegisterScreen>
     });
   }
 
-  void _submit() {
-    if (!_canSubmit) return;
-    ProfileStore.instance.save(
-      ProfileStore.instance.data.copyWith(
-        name: _nameCtrl.text.trim(),
-        promo: _showPromo ? _promoCtrl.text.trim() : null,
-      ),
-    );
-    context.go('/home');
+  Future<void> _submit() async {
+    if (!_canSubmit || _submitting) return;
+    final name = _nameCtrl.text.trim();
+    final promo = _showPromo ? _promoCtrl.text.trim() : '';
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await ApiClient.instance.put(
+        '/profile',
+        body: {'name': name, 'promo_code': promo},
+      );
+      ProfileStore.instance.save(
+        ProfileStore.instance.data.copyWith(
+          name: name,
+          promo: _showPromo ? promo : null,
+        ),
+      );
+      if (!mounted) return;
+      context.go('/home');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -207,9 +228,21 @@ class _RegisterScreenState extends State<RegisterScreen>
                             ),
                           ],
                         ),
+                        if (_error != null) ...[
+                          SizedBox(height: 12 * s),
+                          Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.body().copyWith(
+                              fontSize: 13 * s,
+                              color: const Color(0xFFE05656),
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 32 * s),
                         _SubmitButton(
-                          enabled: _canSubmit,
+                          enabled: _canSubmit && !_submitting,
+                          loading: _submitting,
                           onTap: _submit,
                           scale: s,
                         ),
@@ -354,11 +387,13 @@ class _TextInput extends StatelessWidget {
 
 class _SubmitButton extends StatefulWidget {
   final bool enabled;
+  final bool loading;
   final VoidCallback onTap;
   final double scale;
 
   const _SubmitButton({
     required this.enabled,
+    this.loading = false,
     required this.onTap,
     required this.scale,
   });
@@ -399,13 +434,24 @@ class _SubmitButtonState extends State<_SubmitButton> {
                 : null,
           ),
           alignment: Alignment.center,
-          child: Text(
-            'Завершить регистрацию',
-            style: AppTextStyles.button().copyWith(
-              fontSize: 18 * s,
-              color: widget.enabled ? Colors.white : const Color(0xFFF3F1EF),
-            ),
-          ),
+          child: widget.loading
+              ? SizedBox(
+                  width: 22 * s,
+                  height: 22 * s,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                  ),
+                )
+              : Text(
+                  'Завершить регистрацию',
+                  style: AppTextStyles.button().copyWith(
+                    fontSize: 18 * s,
+                    color: widget.enabled
+                        ? Colors.white
+                        : const Color(0xFFF3F1EF),
+                  ),
+                ),
         ),
       ),
     );

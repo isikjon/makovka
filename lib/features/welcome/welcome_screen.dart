@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api/auth_store.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -36,7 +37,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     Future.delayed(const Duration(milliseconds: 2200), () {
       if (!mounted) return;
-      context.go('/onboarding');
+      context.go(AuthStore.instance.isAuthenticated ? '/home' : '/onboarding');
     });
   }
 
