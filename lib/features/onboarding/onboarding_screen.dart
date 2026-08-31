@@ -28,21 +28,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       background: 'assets/images/onboarding_1_bg.svg',
       title: 'Карта лояльности\nвсегда с собой',
       description:
-          'Просто покажите QR-код из приложения кассиру при покупке. Копите баллы за каждый визит и оплачивайте ими любимые булочки!',
+          'Просто покажите QR-код из приложения кассиру при покупке и получайте скидку на любимую выпечку!',
     ),
     _OnboardingPageData(
       illustration: 'assets/images/onboarding_2_ava.png',
       background: 'assets/images/onboarding_2_bg.svg',
-      title: 'Растите в уровнях\nи получайте больше',
+      title: 'Скидка 10%\nна все покупки',
       description:
-          'Бронза, серебро, золото — чем чаще заходите, тем выгоднее покупки. Каждый уровень открывает новые бонусы и подарки.',
+          'Скидка действует сразу и без условий на каждую покупку в пекарне.',
     ),
     _OnboardingPageData(
       illustration: 'assets/images/onboarding_3_ava.png',
       background: 'assets/images/onboarding_3_bg.svg',
       title: 'Находите пекарни\nрядом с вами',
       description:
-          'Смотрите ближайшие точки на карте, узнавайте о свежих акциях и скидках до 15% в любимой пекарне.',
+          'Смотрите ближайшие точки на карте и узнавайте о свежих акциях в любимой пекарне.',
     ),
   ];
 

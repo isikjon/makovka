@@ -4,61 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 
-class _Tier {
-  final String name;
-  final String discount;
-  final int threshold;
-  final Color pillBg;
-  final Color pillText;
-  final Color borderColor;
-  const _Tier({
-    required this.name,
-    required this.discount,
-    required this.threshold,
-    required this.pillBg,
-    required this.pillText,
-    required this.borderColor,
-  });
-}
-
-const _currentSpend = 2450;
-const _nextThreshold = 5000;
-
-const _nextTiers = [
-  _Tier(
-    name: 'Серебро',
-    discount: 'Скидка 5%',
-    threshold: 5000,
-    pillBg: Color(0xFFDEDEDE),
-    pillText: Color(0xFF5A5A5A),
-    borderColor: Color(0xFFDAD9AA),
-  ),
-  _Tier(
-    name: 'Золото',
-    discount: 'Скидка 7%',
-    threshold: 10000,
-    pillBg: Color(0xFFF5C242),
-    pillText: Color(0xFF7A5200),
-    borderColor: Color(0xFFE8CE7A),
-  ),
-  _Tier(
-    name: 'Платина',
-    discount: 'Скидка 9%',
-    threshold: 15000,
-    pillBg: Color(0xFFDCE4F7),
-    pillText: Color(0xFF3D5A8A),
-    borderColor: Color(0xFFC9D3E8),
-  ),
-  _Tier(
-    name: 'Бриллиант',
-    discount: 'Скидка 11%',
-    threshold: 20000,
-    pillBg: Color(0xFFEAD8F7),
-    pillText: Color(0xFF7A3FA0),
-    borderColor: Color(0xFFDCC7EE),
-  ),
-];
-
 class LoyaltyScreen extends StatefulWidget {
   const LoyaltyScreen({super.key});
 
@@ -127,7 +72,7 @@ class _LoyaltyScreenState extends State<LoyaltyScreen>
                     alignment: Alignment.center,
                     children: [
                       Text(
-                        'Уровни лояльности',
+                        'Ваша скидка',
                         style: AppTextStyles.h1().copyWith(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
@@ -152,22 +97,9 @@ class _LoyaltyScreenState extends State<LoyaltyScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const _CurrentTierCard(),
+                            const _DiscountCard(),
                             const SizedBox(height: 16),
                             const _SavingsBanner(),
-                            const SizedBox(height: 28),
-                            Text(
-                              'Уровни лояльности',
-                              style: AppTextStyles.h1().copyWith(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            for (final tier in _nextTiers) ...[
-                              _TierCard(tier: tier),
-                              const SizedBox(height: 14),
-                            ],
                             SizedBox(height: AppBottomNav.barHeight + 20),
                           ],
                         ),
@@ -197,14 +129,11 @@ class _LoyaltyScreenState extends State<LoyaltyScreen>
   }
 }
 
-class _CurrentTierCard extends StatelessWidget {
-  const _CurrentTierCard();
+class _DiscountCard extends StatelessWidget {
+  const _DiscountCard();
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_currentSpend / _nextThreshold).clamp(0.0, 1.0);
-    final remaining = _nextThreshold - _currentSpend;
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: Container(
@@ -239,90 +168,42 @@ class _CurrentTierCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Бронза',
-                        style: AppTextStyles.h1().copyWith(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                        ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8C5A2B), Color(0xFFC08A4E)],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF8C5A2B), Color(0xFFC08A4E)],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Скидка 10%',
-                          style: AppTextStyles.body().copyWith(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Скидка 10%',
+                      style: AppTextStyles.body().copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Stack(
-                      children: [
-                        Container(height: 10, color: const Color(0xFFECE9E4)),
-                        FractionallySizedBox(
-                          widthFactor: progress,
-                          child: Container(
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Color(0xFF6E4420),
-                                  Color(0xFFB98A50),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '2 450 ₽',
-                        style: AppTextStyles.body().copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                      Text(
-                        '5 000 ₽',
-                        style: AppTextStyles.body().copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   Text(
-                    'Осталось ${_formatRub(remaining)} до уровня Серебро',
+                    'Скидка действует на все покупки в пекарне',
                     style: AppTextStyles.body().copyWith(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Просто покажите QR-код из приложения на кассе',
+                    style: AppTextStyles.body().copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ],
@@ -370,98 +251,6 @@ class _SavingsBanner extends StatelessWidget {
   }
 }
 
-class _TierCard extends StatelessWidget {
-  final _Tier tier;
-  const _TierCard({required this.tier});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: tier.borderColor, width: 1.4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                tier.name,
-                style: AppTextStyles.h1().copyWith(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: tier.pillBg,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  tier.discount,
-                  style: AppTextStyles.body().copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: tier.pillText,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF2F0ED),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.lock_outline_rounded,
-                  size: 18,
-                  color: Color(0xFFB7B2AC),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Сумма покупок от ${_formatRub(tier.threshold)}',
-            style: AppTextStyles.body().copyWith(
-              fontSize: 13,
-              color: AppColors.textMuted,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(
-                Icons.star_outline_rounded,
-                size: 15,
-                color: AppColors.textMuted,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Бесплатный десерт на День рождения',
-                style: AppTextStyles.body().copyWith(
-                  fontSize: 13,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _BackButton extends StatefulWidget {
   final VoidCallback onTap;
   const _BackButton({required this.onTap});
@@ -497,14 +286,4 @@ class _BackButtonState extends State<_BackButton> {
       ),
     );
   }
-}
-
-String _formatRub(int amount) {
-  final s = amount.toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buffer.write(' ');
-    buffer.write(s[i]);
-  }
-  return '$buffer ₽';
 }
