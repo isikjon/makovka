@@ -9,6 +9,7 @@ import '../../features/shell/main_shell.dart';
 import '../../features/promo/referral_program_screen.dart';
 import '../../features/qr/qr_code_screen.dart';
 import '../../features/legal/privacy_policy_screen.dart';
+import '../../features/legal/delete_account_screen.dart';
 import '../../features/history/purchase_history_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/locations/locations_screen.dart';
@@ -99,6 +100,11 @@ class AppRouter {
         path: '/legal/privacy',
         pageBuilder: (context, state) =>
             _fadeThroughPage(state, const PrivacyPolicyScreen()),
+      ),
+      GoRoute(
+        path: '/legal/delete-account',
+        pageBuilder: (context, state) =>
+            _fadeThroughPage(state, const DeleteAccountScreen()),
       ),
       GoRoute(
         path: '/history',
