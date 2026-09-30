@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../api/auth_store.dart';
 import '../../features/welcome/welcome_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/auth/phone_auth_screen.dart';
@@ -47,9 +48,24 @@ CustomTransitionPage<void> _fadeThroughPage(
   );
 }
 
+const _publicLocations = {
+  '/',
+  '/onboarding',
+  '/auth/phone',
+  '/auth/otp',
+  '/legal/privacy',
+  '/legal/delete-account',
+};
+
 class AppRouter {
   static final router = GoRouter(
     initialLocation: '/',
+    refreshListenable: AuthStore.instance,
+    redirect: (context, state) {
+      if (AuthStore.instance.isAuthenticated) return null;
+      if (_publicLocations.contains(state.matchedLocation)) return null;
+      return '/auth/phone';
+    },
     routes: [
       GoRoute(
         path: '/',

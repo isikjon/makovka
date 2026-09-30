@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/loyalty/loyalty_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../shared/widgets/promo_cards.dart';
@@ -31,6 +32,7 @@ class _PromoScreenState extends State<PromoScreen>
       begin: const Offset(0, 0.03),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _enter, curve: Curves.easeOutCubic));
+    LoyaltyStore.instance.load();
   }
 
   @override
@@ -103,7 +105,12 @@ class _PromoScreenState extends State<PromoScreen>
                       position: _slideUp,
                       child: Column(
                         children: [
-                          const CoffeeStampCard(collected: 4, total: 7),
+                          ListenableBuilder(
+                            listenable: LoyaltyStore.instance,
+                            builder: (context, _) => CoffeeStampCard(
+                              progress: LoyaltyStore.instance.info?.coffee,
+                            ),
+                          ),
                           const SizedBox(height: 20),
                           ReferralBanner(
                             onInvite: () => context.push('/promo/referral'),

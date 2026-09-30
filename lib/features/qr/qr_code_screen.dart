@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../../core/api/api_client.dart';
+import '../../core/loyalty/loyalty_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
+import '../../shared/widgets/status_views.dart';
 
 class QrCodeScreen extends StatefulWidget {
   const QrCodeScreen({super.key});
@@ -14,7 +17,10 @@ class QrCodeScreen extends StatefulWidget {
 
 class _QrCodeScreenState extends State<QrCodeScreen>
     with SingleTickerProviderStateMixin {
-  static const _personalCode = '3872723547344267';
+  final _store = LoyaltyStore.instance;
+  String? _fallbackCard;
+  late bool _busy = _store.info?.cardNumber == null;
+  String? _error;
 
   late final AnimationController _enter;
   late final Animation<double> _fade;
@@ -31,12 +37,72 @@ class _QrCodeScreenState extends State<QrCodeScreen>
     _scale = Tween<double>(begin: 0.94, end: 1.0).animate(
       CurvedAnimation(parent: _enter, curve: Curves.easeOutBack),
     );
+    if (_busy) _resolveCard();
   }
 
   @override
   void dispose() {
     _enter.dispose();
     super.dispose();
+  }
+
+  Future<void> _resolveCard({bool force = false}) async {
+    try {
+      final card = await _store.resolveCardNumber(force: force);
+      if (!mounted) return;
+      setState(() {
+        _fallbackCard = card;
+        _busy = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _busy = false;
+      });
+    }
+  }
+
+  void _retry() {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    _resolveCard(force: true);
+  }
+
+  Widget _buildCardContent() {
+    final info = _store.info;
+    final card = info?.cardNumber ?? _fallbackCard;
+    if (card != null) return _QrCode(code: card);
+    if (_busy) return const _CardPlaceholder(child: LoadingSpinner());
+    final error = _error ?? (info == null ? _store.error : null);
+    if (error != null) {
+      return _CardPlaceholder(
+        child: StatusMessage(
+          title: 'Не удалось загрузить код',
+          subtitle: error,
+          onRetry: _retry,
+        ),
+      );
+    }
+    if (info?.syncStatus == 'failed') {
+      return _CardPlaceholder(
+        child: StatusMessage(
+          title: 'Не удалось оформить карту',
+          subtitle:
+              'Нажмите «Повторить». Если не получится, '
+              'обратитесь к сотруднику пекарни',
+          onRetry: _retry,
+        ),
+      );
+    }
+    return _CardPlaceholder(
+      child: StatusMessage(
+        title: 'Карта оформляется, попробуйте через минуту',
+        onRetry: _retry,
+      ),
+    );
   }
 
   @override
@@ -121,7 +187,11 @@ class _QrCodeScreenState extends State<QrCodeScreen>
                               child: Center(
                                 child: ScaleTransition(
                                   scale: _scale,
-                                  child: _QrCard(code: _personalCode),
+                                  child: ListenableBuilder(
+                                    listenable: _store,
+                                    builder: (context, _) =>
+                                        _QrCard(child: _buildCardContent()),
+                                  ),
                                 ),
                               ),
                             ),
@@ -227,8 +297,8 @@ class _CloseButtonState extends State<_CloseButton> {
 }
 
 class _QrCard extends StatelessWidget {
-  final String code;
-  const _QrCard({required this.code});
+  final Widget child;
+  const _QrCard({required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -246,34 +316,57 @@ class _QrCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          QrImageView(
-            data: code,
-            version: QrVersions.auto,
-            size: 200,
-            eyeStyle: const QrEyeStyle(
-              eyeShape: QrEyeShape.square,
-              color: AppColors.textPrimary,
-            ),
-            dataModuleStyle: const QrDataModuleStyle(
-              dataModuleShape: QrDataModuleShape.square,
-              color: AppColors.textPrimary,
-            ),
+      child: child,
+    );
+  }
+}
+
+class _QrCode extends StatelessWidget {
+  final String code;
+  const _QrCode({required this.code});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        QrImageView(
+          data: code,
+          version: QrVersions.auto,
+          size: 200,
+          eyeStyle: const QrEyeStyle(
+            eyeShape: QrEyeShape.square,
+            color: AppColors.textPrimary,
           ),
-          const SizedBox(height: 16),
-          Text(
-            code,
-            style: AppTextStyles.body().copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-              letterSpacing: 0.5,
-            ),
+          dataModuleStyle: const QrDataModuleStyle(
+            dataModuleShape: QrDataModuleShape.square,
+            color: AppColors.textPrimary,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          code,
+          style: AppTextStyles.body().copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CardPlaceholder extends StatelessWidget {
+  final Widget child;
+  const _CardPlaceholder({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 237,
+      child: Center(child: child),
     );
   }
 }

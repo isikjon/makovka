@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import '../../core/loyalty/loyalty_store.dart';
 import '../../core/theme/app_theme.dart';
 
 /// "Скидка 99% на каждый 8 кофе" coffee-stamp promo card.
 class CoffeeStampCard extends StatelessWidget {
-  final int collected;
-  final int total;
-  const CoffeeStampCard({super.key, required this.collected, required this.total});
+  final CoffeeProgress? progress;
+  const CoffeeStampCard({super.key, this.progress});
 
   static const _designW = 355.0;
   static const _designH = 169.0;
+  static const _defaultCups = 7;
 
   @override
   Widget build(BuildContext context) {
+    final collected = progress?.collected;
+    final cups = progress?.goal ?? _defaultCups;
+    final rewardNumber = cups + 1;
     return AspectRatio(
       aspectRatio: _designW / _designH,
       child: LayoutBuilder(
@@ -50,9 +54,9 @@ class CoffeeStampCard extends StatelessWidget {
                           style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                         const TextSpan(text: ' на каждый '),
-                        const TextSpan(
-                          text: '8',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                        TextSpan(
+                          text: '$rewardNumber',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         const TextSpan(text: ' кофе'),
                       ],
@@ -60,35 +64,39 @@ class CoffeeStampCard extends StatelessWidget {
                   ),
                 ),
 
-                // Cup row: 7 plain cups + "=" + 1 highlighted cup w/ badge
                 Positioned(
                   top: 52 * s,
                   left: 20 * s,
                   right: 20 * s,
                   child: SizedBox(
                     height: 56 * s,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        for (var i = 0; i < total; i++) ...[
-                          _StampCup(
-                            filled: i < collected,
-                            scale: s,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          for (var i = 0; i < cups; i++) ...[
+                            _StampCup(
+                              filled: collected != null && i < collected,
+                              scale: s,
+                            ),
+                            if (i != cups - 1) SizedBox(width: 4 * s),
+                          ],
+                          SizedBox(width: 8 * s),
+                          Text(
+                            '=',
+                            style: AppTextStyles.h1().copyWith(
+                              fontSize: 20 * s,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                          if (i != total - 1) SizedBox(width: 4 * s),
+                          SizedBox(width: 8 * s),
+                          _HighlightCup(scale: s),
                         ],
-                        SizedBox(width: 8 * s),
-                        Text(
-                          '=',
-                          style: AppTextStyles.h1().copyWith(
-                            fontSize: 20 * s,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        SizedBox(width: 8 * s),
-                        _HighlightCup(scale: s),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -99,7 +107,7 @@ class CoffeeStampCard extends StatelessWidget {
                   left: 20 * s,
                   right: 90 * s,
                   child: Text(
-                    'Копите чашки в приложении:\nкаждый 8-й кофе — за 1% стоимости!',
+                    'Копите чашки в приложении:\nкаждый $rewardNumber-й кофе — за 1% стоимости!',
                     style: AppTextStyles.body().copyWith(
                       fontSize: 12 * s,
                       height: 16 / 12,
@@ -108,31 +116,31 @@ class CoffeeStampCard extends StatelessWidget {
                   ),
                 ),
 
-                // Progress "1/7"
-                Positioned(
-                  right: 20 * s,
-                  bottom: 16 * s,
-                  child: RichText(
-                    text: TextSpan(
-                      style: AppTextStyles.h1().copyWith(
-                        fontSize: 22 * s,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.orange,
-                      ),
-                      children: [
-                        TextSpan(text: '$collected'),
-                        TextSpan(
-                          text: '/$total',
-                          style: TextStyle(
-                            fontSize: 16 * s,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
-                          ),
+                if (collected != null)
+                  Positioned(
+                    right: 20 * s,
+                    bottom: 16 * s,
+                    child: RichText(
+                      text: TextSpan(
+                        style: AppTextStyles.h1().copyWith(
+                          fontSize: 22 * s,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.orange,
                         ),
-                      ],
+                        children: [
+                          TextSpan(text: '$collected'),
+                          TextSpan(
+                            text: '/$cups',
+                            style: TextStyle(
+                              fontSize: 16 * s,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           );

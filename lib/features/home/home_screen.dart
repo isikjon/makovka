@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/format/money_format.dart';
+import '../../core/loyalty/loyalty_store.dart';
 import '../../core/profile/profile_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../shared/widgets/promo_cards.dart';
+import '../../shared/widgets/status_views.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,7 +17,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  final _loyalty = LoyaltyStore.instance;
+  late final _heroData = Listenable.merge([ProfileStore.instance, _loyalty]);
+
   late final AnimationController _enter;
   late final Animation<double> _fade;
   late final Animation<Offset> _slideUp;
@@ -31,37 +37,61 @@ class _HomeScreenState extends State<HomeScreen>
       begin: const Offset(0, 0.03),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _enter, curve: Curves.easeOutCubic));
+    WidgetsBinding.instance.addObserver(this);
+    _loyalty.load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _enter.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loyalty.load();
+  }
+
+  Future<void> _refresh() async {
+    await _loyalty.refresh();
+    final error = _loyalty.error;
+    if (!mounted || error == null || _loyalty.info == null) return;
+    showErrorSnackBar(context, error);
   }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: FadeTransition(
-          opacity: _fade,
-          child: SlideTransition(
-            position: _slideUp,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+      child: RefreshIndicator(
+        color: AppColors.orange,
+        onRefresh: _refresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          child: FadeTransition(
+            opacity: _fade,
+            child: SlideTransition(
+              position: _slideUp,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   AnimatedBuilder(
-                    animation: ProfileStore.instance,
+                    animation: _heroData,
                     builder: (context, _) => _HeroBlock(
                       userName: ProfileStore.instance.displayName,
-                      discountLabel: 'Скидка 10%',
-                      savedAmount: '250 ₽',
+                      discountLabel: _discountLabel(_loyalty.info),
+                      savedAmount: _savedAmount(_loyalty.info),
                       onMenu: () => Scaffold.of(context).openDrawer(),
                       onLocation: () => context.push('/locations'),
                       onInfo: () => context.push('/loyalty'),
                     ),
+                  ),
+                  ListenableBuilder(
+                    listenable: _loyalty,
+                    builder: (context, _) => _buildLoyaltyError(),
                   ),
                   const SizedBox(height: 20),
                   Padding(
@@ -75,7 +105,11 @@ class _HomeScreenState extends State<HomeScreen>
                   const SizedBox(height: 28),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: CoffeeStampCard(collected: 1, total: 7),
+                    child: ListenableBuilder(
+                      listenable: _loyalty,
+                      builder: (context, _) =>
+                          CoffeeStampCard(progress: _loyalty.info?.coffee),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Padding(
@@ -95,17 +129,41 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                   SizedBox(height: AppBottomNav.barHeight + 20),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildLoyaltyError() {
+    final error = _loyalty.error;
+    if (error == null || _loyalty.info != null || _loyalty.isLoading) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      child: StatusCard(
+        title: 'Не удалось загрузить данные',
+        subtitle: error,
+        onRetry: () => _loyalty.load(force: true),
+      ),
+    );
+  }
+
+  String _discountLabel(LoyaltyInfo? info) {
+    if (info == null) return 'Скидка —';
+    return 'Скидка ${formatPercent(info.currentTier.discountPercent)}';
+  }
+
+  String _savedAmount(LoyaltyInfo? info) {
+    if (info == null) return '—';
+    return formatRub(info.totalSavings);
+  }
 }
 
-/// Compact hero: peach illustration crop on top, small white shelf at bottom
-/// with Сэкономлено / 250 ₽ / info.
 class _HeroBlock extends StatelessWidget {
   final String userName;
   final String discountLabel;
