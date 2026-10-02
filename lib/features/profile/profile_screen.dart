@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/auth_store.dart';
+import '../../core/content/json_values.dart';
 import '../../core/profile/profile_store.dart';
+import '../../core/referral/referral_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 
@@ -39,6 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   _Gender? _gender = _Gender.female;
   bool _saving = false;
+  String _appliedPromo = '';
 
   @override
   void initState() {
@@ -78,40 +81,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _emailCtrl.text = data.email;
       _birthdateCtrl.text = data.birthdate;
       _promoCtrl.text = data.promo;
+      _appliedPromo = data.promo;
       if (data.gender == 'male') _gender = _Gender.male;
       if (data.gender == 'female') _gender = _Gender.female;
     });
 
     if (!AuthStore.instance.isAuthenticated) return;
+    final Map<String, dynamic> remote;
     try {
-      final remote = await ApiClient.instance.get('/profile');
-      if (!mounted) return;
-      setState(() {
-        _nameCtrl.text = remote['name'] as String? ?? _nameCtrl.text;
-        _surnameCtrl.text = remote['surname'] as String? ?? _surnameCtrl.text;
-        _phoneCtrl.text = remote['phone'] as String? ?? _phoneCtrl.text;
-        _emailCtrl.text = remote['email'] as String? ?? _emailCtrl.text;
-        _birthdateCtrl.text =
-            remote['birthdate'] as String? ?? _birthdateCtrl.text;
-        _promoCtrl.text = remote['promo_code'] as String? ?? _promoCtrl.text;
-        final gender = remote['gender'] as String?;
-        if (gender == 'male') _gender = _Gender.male;
-        if (gender == 'female') _gender = _Gender.female;
-      });
-      await ProfileStore.instance.save(
-        ProfileData(
-          name: _nameCtrl.text,
-          surname: _surnameCtrl.text,
-          phone: _phoneCtrl.text,
-          email: _emailCtrl.text,
-          birthdate: _birthdateCtrl.text,
-          promo: _promoCtrl.text,
-          gender: _gender == _Gender.male ? 'male' : 'female',
-        ),
-      );
-    } on ApiException catch (_) {
-      // Backend unreachable — keep showing the locally cached profile.
+      remote = await guardRequest(() => ApiClient.instance.get('/profile'));
+    } on ApiException {
+      return;
     }
+    if (!mounted) return;
+    setState(() {
+      _nameCtrl.text = remote['name'] as String? ?? _nameCtrl.text;
+      _surnameCtrl.text = remote['surname'] as String? ?? _surnameCtrl.text;
+      _phoneCtrl.text = remote['phone'] as String? ?? _phoneCtrl.text;
+      _emailCtrl.text = remote['email'] as String? ?? _emailCtrl.text;
+      _birthdateCtrl.text =
+          remote['birthdate'] as String? ?? _birthdateCtrl.text;
+      _promoCtrl.text = remote['promo_code'] as String? ?? _promoCtrl.text;
+      _appliedPromo = _promoCtrl.text;
+      final gender = remote['gender'] as String?;
+      if (gender == 'male') _gender = _Gender.male;
+      if (gender == 'female') _gender = _Gender.female;
+    });
+    await ProfileStore.instance.save(
+      ProfileData(
+        name: _nameCtrl.text,
+        surname: _surnameCtrl.text,
+        phone: _phoneCtrl.text,
+        email: _emailCtrl.text,
+        birthdate: _birthdateCtrl.text,
+        promo: _promoCtrl.text,
+        gender: _gender == _Gender.male ? 'male' : 'female',
+      ),
+    );
   }
 
   Future<void> _saveProfile() async {
@@ -142,34 +148,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     setState(() => _saving = true);
+    ReferralApplyResult? referral;
     try {
+      var savedPromo = profile.promo;
       if (AuthStore.instance.isAuthenticated) {
-        await ApiClient.instance.put(
-          '/profile',
-          body: {
-            'name': profile.name,
-            'surname': profile.surname,
-            'email': profile.email,
-            'birthdate': profile.birthdate,
-            'gender': profile.gender,
-            'promo_code': profile.promo,
-          },
+        referral = await _applyPromo(profile.promo);
+        savedPromo = profile.promo.isEmpty ? '' : _appliedPromo;
+        await guardRequest(
+          () => ApiClient.instance.put(
+            '/profile',
+            body: {
+              'name': profile.name,
+              'surname': profile.surname,
+              'email': profile.email,
+              'birthdate': profile.birthdate,
+              'gender': profile.gender,
+              'promo_code': savedPromo,
+            },
+          ),
+        );
+        _appliedPromo = savedPromo;
+      }
+      await ProfileStore.instance.save(profile.copyWith(promo: savedPromo));
+      if (!mounted) return;
+      if (referral == null || referral.applied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              referral == null
+                  ? 'Профиль сохранён'
+                  : 'Профиль сохранён. ${referral.message}',
+            ),
+            backgroundColor: AppColors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Профиль сохранён, но промокод не применён: ${referral.message}',
+            ),
+            backgroundColor: const Color(0xFFE05656),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
-      await ProfileStore.instance.save(profile);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Профиль сохранён'),
-          backgroundColor: AppColors.orange,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     } on ApiException catch (e) {
       if (!mounted) return;
+      final message = referral != null && referral.applied
+          ? '${referral.message}, но профиль не сохранён: ${e.message}'
+          : e.message;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message),
+          content: Text(message),
           backgroundColor: const Color(0xFFE05656),
           behavior: SnackBarBehavior.floating,
         ),
@@ -177,6 +209,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<ReferralApplyResult?> _applyPromo(String promo) async {
+    if (promo.isEmpty || promo == _appliedPromo) return null;
+    final result = await ReferralStore.instance.apply(promo);
+    if (result.applied) _appliedPromo = promo;
+    return result;
   }
 
   Future<void> _confirmLogout() async {

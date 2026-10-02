@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api/auth_store.dart';
+
 class ProfileData {
   final String name;
   final String surname;
@@ -41,13 +43,21 @@ class ProfileData {
   }
 }
 
-/// App-wide source of truth for the saved profile. Loaded once at startup
-/// from shared_preferences; every screen that shows profile data listens to
-/// this instead of reading prefs itself, so a save on the Profile screen
-/// shows up everywhere immediately without any navigation/refresh trick.
 class ProfileStore extends ChangeNotifier {
-  ProfileStore._();
+  ProfileStore._() {
+    AuthStore.instance.addListener(_onAuthChanged);
+  }
   static final ProfileStore instance = ProfileStore._();
+
+  static const _prefKeys = [
+    'profile_name',
+    'profile_surname',
+    'profile_phone',
+    'profile_email',
+    'profile_birthdate',
+    'profile_promo',
+    'profile_gender',
+  ];
 
   ProfileData _data = const ProfileData();
   ProfileData get data => _data;
@@ -87,9 +97,14 @@ class ProfileStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Convenience for flows (e.g. registration) that only ever set the name.
-  Future<void> saveName(String name) async {
-    if (!_loaded) await load();
-    await save(_data.copyWith(name: name));
+  void _onAuthChanged() {
+    if (!AuthStore.instance.isAuthenticated) _clear();
+  }
+
+  Future<void> _clear() async {
+    _data = const ProfileData();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await Future.wait(_prefKeys.map(prefs.remove));
   }
 }

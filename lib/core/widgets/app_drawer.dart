@@ -96,7 +96,7 @@ class AppDrawer extends StatelessWidget {
               padding: EdgeInsets.only(bottom: 20),
               child: Center(
                 child: Text(
-                  'Маковка App Версия 1.0',
+                  'Версия 1.0.1',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textMuted,

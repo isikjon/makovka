@@ -129,7 +129,7 @@ class _InstallCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Установите Маковку',
+                  'Установите приложение',
                   style: AppTextStyles.body().copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -217,7 +217,7 @@ class _IosHintCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Установите Маковку',
+                  'Установите приложение',
                   style: AppTextStyles.body().copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,

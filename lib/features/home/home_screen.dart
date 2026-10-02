@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/content/content_store.dart';
 import '../../core/format/money_format.dart';
 import '../../core/loyalty/loyalty_store.dart';
 import '../../core/profile/profile_store.dart';
@@ -19,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _loyalty = LoyaltyStore.instance;
+  final _content = ContentStore.instance;
   late final _heroData = Listenable.merge([ProfileStore.instance, _loyalty]);
 
   late final AnimationController _enter;
@@ -39,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen>
     ).animate(CurvedAnimation(parent: _enter, curve: Curves.easeOutCubic));
     WidgetsBinding.instance.addObserver(this);
     _loyalty.load();
+    _content.load();
   }
 
   @override
@@ -50,14 +53,18 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _loyalty.load();
+    if (state != AppLifecycleState.resumed) return;
+    _loyalty.load();
+    _content.load();
   }
 
   Future<void> _refresh() async {
-    await _loyalty.refresh();
-    final error = _loyalty.error;
-    if (!mounted || error == null || _loyalty.info == null) return;
-    showErrorSnackBar(context, error);
+    await Future.wait([_loyalty.refresh(), _content.refresh()]);
+    if (!mounted) return;
+    final loyaltyError = _loyalty.info == null ? null : _loyalty.error;
+    final contentError = _content.data == null ? null : _content.error;
+    final error = loyaltyError ?? contentError;
+    if (error != null) showErrorSnackBar(context, error);
   }
 
   @override
@@ -93,39 +100,11 @@ class _HomeScreenState extends State<HomeScreen>
                     listenable: _loyalty,
                     builder: (context, _) => _buildLoyaltyError(),
                   ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ReferralBanner(
-                      onInvite: () => context.push('/promo/referral'),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  const _NewItemsSection(),
-                  const SizedBox(height: 28),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ListenableBuilder(
-                      listenable: _loyalty,
-                      builder: (context, _) =>
-                          CoffeeStampCard(progress: _loyalty.info?.coffee),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: HappyHoursCard(
-                      timeRange: 'С 20:30 до 00:00',
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ComboPromoCard(
-                      title: 'Комбо: Круассан + Американо',
-                      subtitle: 'Идеальное утреннее сочетание',
-                      price: '299 ₽',
-                      oldPrice: '420 ₽',
+                  ListenableBuilder(
+                    listenable: _content,
+                    builder: (context, _) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _buildContent(),
                     ),
                   ),
                   SizedBox(height: AppBottomNav.barHeight + 20),
@@ -135,6 +114,51 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ),
       ),
+    );
+  }
+
+  List<Widget> _buildContent() {
+    final data = _content.data;
+    if (data == null) {
+      final error = _content.error;
+      return [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+          child: error != null && !_content.isLoading
+              ? StatusCard(
+                  title: 'Не удалось загрузить новинки и акции',
+                  subtitle: error,
+                  onRetry: () => _content.load(force: true),
+                )
+              : const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: LoadingSpinner()),
+                ),
+        ),
+      ];
+    }
+    final promotions = data.homePromotions;
+    final trailing = promotions.skip(1).toList();
+    return [
+      for (final promotion in promotions.take(1)) ...[
+        const SizedBox(height: 20),
+        _padded(PromotionCard(promotion: promotion)),
+      ],
+      if (data.novelties.isNotEmpty) ...[
+        const SizedBox(height: 28),
+        _NoveltiesSection(items: data.novelties),
+      ],
+      for (var i = 0; i < trailing.length; i++) ...[
+        SizedBox(height: i == 0 ? 28 : 20),
+        _padded(PromotionCard(promotion: trailing[i])),
+      ],
+    ];
+  }
+
+  Widget _padded(Widget child) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: child,
     );
   }
 
@@ -192,127 +216,112 @@ class _HeroBlock extends StatelessWidget {
         builder: (context, constraints) {
           final s = constraints.maxWidth / _designW;
           return Stack(
-          children: [
-            // Cropped illustration: keep top (girl + peach), cut white bottom.
-            Positioned.fill(
-              child: Image.asset(
-                'assets/images/home_hero_bg.png',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                filterQuality: FilterQuality.high,
-                isAntiAlias: true,
-              ),
-            ),
-
-            // Top-left burger
-            Positioned(
-              top: 18 * s,
-              left: 18 * s,
-              child: _CircleIconButton(
-                asset: 'assets/icons/burger.svg',
-                onTap: onMenu,
-                scale: s,
-              ),
-            ),
-
-            // Top-right GPS
-            Positioned(
-              top: 18 * s,
-              right: 18 * s,
-              child: _CircleIconButton(
-                asset: 'assets/icons/location.svg',
-                onTap: onLocation,
-                scale: s,
-              ),
-            ),
-
-            // Greeting
-            Positioned(
-              top: 100 * s,
-              left: 20 * s,
-              right: 20 * s,
-              child: Text(
-                'Привет, $userName',
-                style: AppTextStyles.h1().copyWith(
-                  fontSize: 26 * s,
-                  height: 30 / 26,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
+            children: [
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/images/home_hero_bg.png',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                  filterQuality: FilterQuality.high,
+                  isAntiAlias: true,
                 ),
               ),
-            ),
-
-            // Discount pill under title
-            Positioned(
-              top: 148 * s,
-              left: 20 * s,
-              child: _DiscountPill(label: discountLabel, scale: s),
-            ),
-
-            // Saved-amount label + pill, overlapping the illustration
-            Positioned(
-              left: 20 * s,
-              bottom: 46 * s,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Сэкономлено',
-                    style: AppTextStyles.body().copyWith(
-                      fontSize: 13 * s,
-                      height: 16 / 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
+              Positioned(
+                top: 18 * s,
+                left: 18 * s,
+                child: _CircleIconButton(
+                  asset: 'assets/icons/burger.svg',
+                  onTap: onMenu,
+                  scale: s,
+                ),
+              ),
+              Positioned(
+                top: 18 * s,
+                right: 18 * s,
+                child: _CircleIconButton(
+                  asset: 'assets/icons/location.svg',
+                  onTap: onLocation,
+                  scale: s,
+                ),
+              ),
+              Positioned(
+                top: 100 * s,
+                left: 20 * s,
+                right: 20 * s,
+                child: Text(
+                  'Привет, $userName',
+                  style: AppTextStyles.h1().copyWith(
+                    fontSize: 26 * s,
+                    height: 30 / 26,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                   ),
-                  SizedBox(height: 6 * s),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 22 * s,
-                      vertical: 10 * s,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30 * s),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 14 * s,
-                          offset: Offset(0, 5 * s),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      savedAmount,
-                      style: AppTextStyles.h1().copyWith(
-                        fontSize: 26 * s,
-                        height: 30 / 26,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.orange,
+                ),
+              ),
+              Positioned(
+                top: 148 * s,
+                left: 20 * s,
+                child: _DiscountPill(label: discountLabel, scale: s),
+              ),
+              Positioned(
+                left: 20 * s,
+                bottom: 46 * s,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Сэкономлено',
+                      style: AppTextStyles.body().copyWith(
+                        fontSize: 13 * s,
+                        height: 16 / 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: 6 * s),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 22 * s,
+                        vertical: 10 * s,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30 * s),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 14 * s,
+                            offset: Offset(0, 5 * s),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        savedAmount,
+                        style: AppTextStyles.h1().copyWith(
+                          fontSize: 26 * s,
+                          height: 30 / 26,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.orange,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-
-            // Info button, bare icon
-            Positioned(
-              right: 20 * s,
-              bottom: 52 * s,
-              child: _InfoButton(onTap: onInfo, scale: s),
-            ),
-          ],
-        );
+              Positioned(
+                right: 20 * s,
+                bottom: 52 * s,
+                child: _InfoButton(onTap: onInfo, scale: s),
+              ),
+            ],
+          );
         },
-        ),
+      ),
     );
   }
 }
 
-/// Snaps horizontal scrolling to one card at a time, like a carousel,
-/// instead of letting the list settle anywhere (`itemExtent` = card width + gap).
 class _CardSnapPhysics extends ScrollPhysics {
   final double itemExtent;
   const _CardSnapPhysics({required this.itemExtent, super.parent});
@@ -353,10 +362,11 @@ class _CardSnapPhysics extends ScrollPhysics {
       return super.createBallisticSimulation(position, velocity);
     }
     final tolerance = toleranceFor(position);
-    final target = _getTargetPixels(position, tolerance, velocity).clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
+    final target = _getTargetPixels(
+      position,
+      tolerance,
+      velocity,
+    ).clamp(position.minScrollExtent, position.maxScrollExtent);
     if (target != position.pixels) {
       return ScrollSpringSimulation(
         spring,
@@ -373,55 +383,9 @@ class _CardSnapPhysics extends ScrollPhysics {
   bool get allowImplicitScrolling => true;
 }
 
-class _ProductItem {
-  final String image;
-  final String name;
-  const _ProductItem({required this.image, required this.name});
-}
-
-class _NewItemsSection extends StatelessWidget {
-  const _NewItemsSection();
-
-  // Only 3 distinct product photos are available so far; the rest cycle
-  // through them with placeholder names until more assets are supplied.
-  static const _items = [
-    _ProductItem(
-      image: 'assets/images/products/pizza_bbq.png',
-      name: 'Пицца цыпленок\nбарбекю',
-    ),
-    _ProductItem(
-      image: 'assets/images/products/pechusha_ham_cheese.png',
-      name: 'Печуша с ветчиной\nи сыром',
-    ),
-    _ProductItem(
-      image: 'assets/images/products/croissant_chocolate.png',
-      name: 'Круассан с\nшоколадом',
-    ),
-    _ProductItem(
-      image: 'assets/images/products/pizza_bbq.png',
-      name: 'Пицца\nпепперони',
-    ),
-    _ProductItem(
-      image: 'assets/images/products/pechusha_ham_cheese.png',
-      name: 'Печуша с\nгрибами',
-    ),
-    _ProductItem(
-      image: 'assets/images/products/croissant_chocolate.png',
-      name: 'Круассан с\nминдалем',
-    ),
-    _ProductItem(
-      image: 'assets/images/products/pizza_bbq.png',
-      name: 'Пицца\nмаргарита',
-    ),
-    _ProductItem(
-      image: 'assets/images/products/pechusha_ham_cheese.png',
-      name: 'Печуша с\nсыром',
-    ),
-    _ProductItem(
-      image: 'assets/images/products/croissant_chocolate.png',
-      name: 'Круассан\nклассический',
-    ),
-  ];
+class _NoveltiesSection extends StatelessWidget {
+  final List<Novelty> items;
+  const _NoveltiesSection({required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -454,15 +418,11 @@ class _NewItemsSection extends StatelessWidget {
                   itemExtent: cardWidth + gap,
                   parent: const BouncingScrollPhysics(),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: outerPadding,
-                ),
-                itemCount: _items.length,
+                padding: const EdgeInsets.symmetric(horizontal: outerPadding),
+                itemCount: items.length,
                 separatorBuilder: (context, i) => const SizedBox(width: gap),
-                itemBuilder: (context, i) => _ProductCard(
-                  item: _items[i],
-                  width: cardWidth,
-                ),
+                itemBuilder: (context, i) =>
+                    _NoveltyCard(item: items[i], width: cardWidth),
               ),
             );
           },
@@ -472,74 +432,54 @@ class _NewItemsSection extends StatelessWidget {
   }
 }
 
-class _ProductCard extends StatefulWidget {
-  final _ProductItem item;
+class _NoveltyCard extends StatelessWidget {
+  final Novelty item;
   final double width;
-  const _ProductCard({required this.item, required this.width});
-
-  @override
-  State<_ProductCard> createState() => _ProductCardState();
-}
-
-class _ProductCardState extends State<_ProductCard> {
-  bool _pressed = false;
+  const _NoveltyCard({required this.item, required this.width});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTap: () {},
-      child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1.0,
-        duration: const Duration(milliseconds: 140),
-        curve: Curves.easeOut,
-        child: Container(
-          width: widget.width,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                height: 78,
-                child: Image.asset(
-                  widget.item.image,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                  isAntiAlias: true,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                widget.item.name,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                style: AppTextStyles.body().copyWith(
-                  fontSize: 13,
-                  height: 17 / 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: 78,
+            width: double.infinity,
+            child: RemoteImage(url: item.imageUrl, fit: BoxFit.contain),
           ),
-        ),
+          const SizedBox(height: 10),
+          Text(
+            item.title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.body().copyWith(
+              fontSize: 13,
+              height: 17 / 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
 class _CircleIconButton extends StatefulWidget {
   final String asset;
   final VoidCallback onTap;
@@ -569,11 +509,7 @@ class _CircleIconButtonState extends State<_CircleIconButton> {
         scale: _pressed ? 0.92 : 1.0,
         duration: const Duration(milliseconds: 140),
         curve: Curves.easeOut,
-        child: SvgPicture.asset(
-          widget.asset,
-          width: size,
-          height: size,
-        ),
+        child: SvgPicture.asset(widget.asset, width: size, height: size),
       ),
     );
   }
@@ -592,10 +528,7 @@ class _DiscountPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(10 * s),
-        border: Border.all(
-          color: Colors.white,
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white, width: 1),
       ),
       child: Text(
         label,

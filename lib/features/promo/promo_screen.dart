@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:go_router/go_router.dart';
+import '../../core/content/content_store.dart';
 import '../../core/loyalty/loyalty_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../shared/widgets/promo_cards.dart';
+import '../../shared/widgets/status_views.dart';
 
 class PromoScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -16,6 +17,8 @@ class PromoScreen extends StatefulWidget {
 
 class _PromoScreenState extends State<PromoScreen>
     with SingleTickerProviderStateMixin {
+  final _content = ContentStore.instance;
+
   late final AnimationController _enter;
   late final Animation<double> _fade;
   late final Animation<Offset> _slideUp;
@@ -33,6 +36,7 @@ class _PromoScreenState extends State<PromoScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _enter, curve: Curves.easeOutCubic));
     LoyaltyStore.instance.load();
+    _content.load();
   }
 
   @override
@@ -41,12 +45,17 @@ class _PromoScreenState extends State<PromoScreen>
     super.dispose();
   }
 
+  Future<void> _refresh() async {
+    await Future.wait([_content.refresh(), LoyaltyStore.instance.load()]);
+    final error = _content.error;
+    if (!mounted || error == null || _content.data == null) return;
+    showErrorSnackBar(context, error);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Decorative header background, sits behind the title and the
-        // top of the first card.
         Positioned(
           top: 0,
           left: 0,
@@ -62,13 +71,12 @@ class _PromoScreenState extends State<PromoScreen>
             ),
           ),
         ),
-
         SafeArea(
           bottom: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               FadeTransition(
                 opacity: _fade,
                 child: SizedBox(
@@ -87,47 +95,32 @@ class _PromoScreenState extends State<PromoScreen>
                       ),
                       Positioned(
                         left: 16,
-                        child: _BackButton(
-                          onTap: widget.onBack ?? () {},
-                        ),
+                        child: _BackButton(onTap: widget.onBack ?? () {}),
                       ),
                     ],
                   ),
                 ),
               ),
               Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slideUp,
-                      child: Column(
-                        children: [
-                          ListenableBuilder(
-                            listenable: LoyaltyStore.instance,
-                            builder: (context, _) => CoffeeStampCard(
-                              progress: LoyaltyStore.instance.info?.coffee,
-                            ),
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: SlideTransition(
+                    position: _slideUp,
+                    child: RefreshIndicator(
+                      color: AppColors.orange,
+                      onRefresh: _refresh,
+                      child: ListenableBuilder(
+                        listenable: _content,
+                        builder: (context, _) => ListView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
                           ),
-                          const SizedBox(height: 20),
-                          ReferralBanner(
-                            onInvite: () => context.push('/promo/referral'),
-                          ),
-                          const SizedBox(height: 20),
-                          const HappyHoursCard(
-                            timeRange: 'С 20:30 до 00:00',
-                          ),
-                          const SizedBox(height: 20),
-                          const ComboPromoCard(
-                            title: 'Комбо: Круассан + Американо',
-                            subtitle: 'Идеальное утреннее сочетание',
-                            price: '299 ₽',
-                            oldPrice: '420 ₽',
-                          ),
-                          SizedBox(height: AppBottomNav.barHeight + 20),
-                        ],
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                          children: [
+                            ..._buildBody(),
+                            SizedBox(height: AppBottomNav.barHeight + 20),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -138,6 +131,42 @@ class _PromoScreenState extends State<PromoScreen>
         ),
       ],
     );
+  }
+
+  List<Widget> _buildBody() {
+    final data = _content.data;
+    if (data == null) {
+      final error = _content.error;
+      if (error != null && !_content.isLoading) {
+        return [
+          StatusCard(
+            title: 'Не удалось загрузить акции',
+            subtitle: error,
+            onRetry: () => _content.load(force: true),
+          ),
+        ];
+      }
+      return const [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 40),
+          child: Center(child: LoadingSpinner()),
+        ),
+      ];
+    }
+    if (data.promotions.isEmpty) {
+      return const [
+        StatusCard(
+          title: 'Сейчас нет активных акций',
+          subtitle: 'Загляните позже — здесь появятся новые предложения',
+        ),
+      ];
+    }
+    return [
+      for (var i = 0; i < data.promotions.length; i++) ...[
+        if (i > 0) const SizedBox(height: 20),
+        PromotionCard(promotion: data.promotions[i]),
+      ],
+    ];
   }
 }
 

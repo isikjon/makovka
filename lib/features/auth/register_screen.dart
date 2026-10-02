@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/api_client.dart';
+import '../../core/content/json_values.dart';
 import '../../core/profile/profile_store.dart';
+import '../../core/referral/referral_store.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/status_views.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -75,24 +78,53 @@ class _RegisterScreenState extends State<RegisterScreen>
       _submitting = true;
       _error = null;
     });
+    final error = await _putProfile({'name': name});
+    if (error != null) {
+      if (mounted) {
+        setState(() {
+          _error = error;
+          _submitting = false;
+        });
+      }
+      return;
+    }
+    final referral = promo.isEmpty
+        ? null
+        : await ReferralStore.instance.apply(promo);
+    final applied = referral?.applied ?? false;
+    final promoSaved =
+        applied &&
+        await _putProfile({'name': name, 'promo_code': promo}) == null;
+    await ProfileStore.instance.save(
+      ProfileData(
+        name: name,
+        phone: ProfileStore.instance.data.phone,
+        promo: promoSaved ? promo : '',
+      ),
+    );
+    if (!mounted) return;
+    if (referral != null) {
+      if (applied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(referral.message),
+            backgroundColor: AppColors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        showErrorSnackBar(context, referral.message);
+      }
+    }
+    context.go('/home');
+  }
+
+  Future<String?> _putProfile(Map<String, dynamic> body) async {
     try {
-      await ApiClient.instance.put(
-        '/profile',
-        body: {'name': name, 'promo_code': promo},
-      );
-      ProfileStore.instance.save(
-        ProfileStore.instance.data.copyWith(
-          name: name,
-          promo: _showPromo ? promo : null,
-        ),
-      );
-      if (!mounted) return;
-      context.go('/home');
+      await guardRequest(() => ApiClient.instance.put('/profile', body: body));
+      return null;
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _submitting = false);
+      return e.message;
     }
   }
 
@@ -191,7 +223,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           _TextInput(
                                             controller: _promoCtrl,
                                             focusNode: _promoFocus,
-                                            hint: 'Введите код на 200 баллов',
+                                            hint: 'Введите промокод друга',
                                             scale: s,
                                           ),
                                         ],
@@ -259,8 +291,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 }
-
-// ---- shared local widgets ----
 
 class _StepChip extends StatelessWidget {
   final String text;

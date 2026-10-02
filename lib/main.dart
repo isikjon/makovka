@@ -18,7 +18,7 @@ class MakovkaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Маковка',
+      title: 'Пекарня',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       scrollBehavior: _AppScrollBehavior(),

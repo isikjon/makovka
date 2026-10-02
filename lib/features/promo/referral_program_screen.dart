@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/format/money_format.dart';
+import '../../core/referral/referral_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_bottom_nav.dart';
+import '../../shared/widgets/status_views.dart';
 
 class ReferralProgramScreen extends StatefulWidget {
   const ReferralProgramScreen({super.key});
@@ -14,7 +17,7 @@ class ReferralProgramScreen extends StatefulWidget {
 
 class _ReferralProgramScreenState extends State<ReferralProgramScreen>
     with SingleTickerProviderStateMixin {
-  static const _promoCode = 'UGDHCLHR1298';
+  final _store = ReferralStore.instance;
 
   late final AnimationController _enter;
   late final Animation<double> _fade;
@@ -32,6 +35,7 @@ class _ReferralProgramScreenState extends State<ReferralProgramScreen>
       begin: const Offset(0, 0.03),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _enter, curve: Curves.easeOutCubic));
+    _store.load();
   }
 
   @override
@@ -40,12 +44,12 @@ class _ReferralProgramScreenState extends State<ReferralProgramScreen>
     super.dispose();
   }
 
-  void _copyCode() {
-    Clipboard.setData(const ClipboardData(text: _promoCode));
+  void _copy(String text, String confirmation) {
+    Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Промокод скопирован'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(confirmation),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -69,10 +73,6 @@ class _ReferralProgramScreenState extends State<ReferralProgramScreen>
                       builder: (context, constraints) {
                         final headerH =
                             constraints.maxWidth / _Header.aspectRatio;
-                        // The source image already has a big white area
-                        // baked in below the illustration — start the text
-                        // right where that white area begins, instead of
-                        // stacking a second white block after the image.
                         final contentTop = headerH * _Header.whiteStartFrac;
                         return Stack(
                           clipBehavior: Clip.none,
@@ -89,61 +89,16 @@ class _ReferralProgramScreenState extends State<ReferralProgramScreen>
                                   24,
                                   0,
                                 ),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      'Вместе вкуснее!\n200 бонусов вам и другу!',
-                                      textAlign: TextAlign.center,
-                                      style: AppTextStyles.h1().copyWith(
-                                        fontSize: 20,
-                                        height: 26 / 20,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.textPrimary,
+                                child: ListenableBuilder(
+                                  listenable: _store,
+                                  builder: (context, _) => Column(
+                                    children: [
+                                      ..._buildBody(),
+                                      SizedBox(
+                                        height: AppBottomNav.barHeight + 24,
                                       ),
-                                    ),
-                                    const SizedBox(height: 20),
-                                    _PromoCodeField(
-                                      code: _promoCode,
-                                      onCopy: _copyCode,
-                                    ),
-                                    const SizedBox(height: 20),
-                                    Text(
-                                      'Или отправьте другу ссылку на приложение. '
-                                      'После его первого заказа вы оба получите '
-                                      'по 200 бонусов на любимые позиции.',
-                                      style: AppTextStyles.body().copyWith(
-                                        fontSize: 14,
-                                        height: 20 / 14,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'Больше друзей — больше бонусов на вашем счету',
-                                      style: AppTextStyles.body().copyWith(
-                                        fontSize: 14,
-                                        height: 20 / 14,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 24),
-                                    _SendButton(onTap: () {}),
-                                    const SizedBox(height: 24),
-                                    Text(
-                                      'ПРИГЛАШЕНО: 3 ДРУГА · ЗАРАБОТАНО: 600 БАЛЛОВ',
-                                      textAlign: TextAlign.center,
-                                      style: AppTextStyles.body().copyWith(
-                                        fontSize: 11,
-                                        height: 16 / 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textMuted,
-                                        letterSpacing: 0.2,
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      height: AppBottomNav.barHeight + 24,
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -176,18 +131,111 @@ class _ReferralProgramScreenState extends State<ReferralProgramScreen>
       ),
     );
   }
+
+  List<Widget> _buildBody() {
+    final info = _store.info;
+    if (info == null) {
+      final error = _store.error;
+      if (error != null && !_store.isLoading) {
+        return [
+          StatusMessage(
+            title: 'Не удалось загрузить промокод',
+            subtitle: error,
+            onRetry: () => _store.load(force: true),
+          ),
+        ];
+      }
+      return const [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 40),
+          child: Center(child: LoadingSpinner()),
+        ),
+      ];
+    }
+    final bodyStyle = AppTextStyles.body().copyWith(
+      fontSize: 14,
+      height: 20 / 14,
+      color: AppColors.textSecondary,
+    );
+    final bonus = info.hasBonus
+        ? '${formatAmount(info.bonusPerFriend)} ${_bonusWord(info.bonusPerFriend)}'
+        : null;
+    return [
+      Text(
+        bonus == null
+            ? 'Вместе вкуснее!\nПриглашайте друзей'
+            : 'Вместе вкуснее!\n$bonus вам и другу',
+        textAlign: TextAlign.center,
+        style: AppTextStyles.h1().copyWith(
+          fontSize: 20,
+          height: 26 / 20,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      const SizedBox(height: 20),
+      _PromoCodeField(
+        code: info.code,
+        onCopy: () => _copy(info.code, 'Промокод скопирован'),
+      ),
+      const SizedBox(height: 20),
+      Text(
+        'Или отправьте другу приглашение: он сможет указать ваш промокод '
+        'при регистрации или в профиле.',
+        style: bodyStyle,
+      ),
+      const SizedBox(height: 12),
+      Text(
+        bonus == null
+            ? 'Бонусы за приглашения появятся позже.'
+            : 'После первой покупки друга вы оба получите по $bonus. '
+                  'Больше друзей — больше бонусов на вашем счету.',
+        style: bodyStyle,
+      ),
+      const SizedBox(height: 24),
+      _SendButton(
+        onTap: () => _copy(
+          info.shareText,
+          'Приглашение скопировано — отправьте его другу',
+        ),
+      ),
+      const SizedBox(height: 24),
+      Text(
+        _statsLine(info),
+        textAlign: TextAlign.center,
+        style: AppTextStyles.body().copyWith(
+          fontSize: 11,
+          height: 16 / 11,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textMuted,
+          letterSpacing: 0.2,
+        ),
+      ),
+    ];
+  }
+
+  String _statsLine(ReferralInfo info) {
+    return 'ПРИГЛАШЕНО ДРУЗЕЙ: ${info.invitedCount} · '
+        'НАГРАД ПОЛУЧЕНО: ${info.rewardedCount}';
+  }
+
+  String _bonusWord(double amount) {
+    if (amount != amount.roundToDouble()) return 'бонуса';
+    final n = amount.round().abs();
+    final lastTwo = n % 100;
+    final last = n % 10;
+    if (lastTwo >= 11 && lastTwo <= 14) return 'бонусов';
+    if (last == 1) return 'бонус';
+    if (last >= 2 && last <= 4) return 'бонуса';
+    return 'бонусов';
+  }
 }
 
 class _Header extends StatelessWidget {
   final VoidCallback onBack;
   const _Header({required this.onBack});
 
-  /// Natural aspect ratio of referral_page_bg.png (1572x3408), used
-  /// unmodified — nothing cropped.
   static const aspectRatio = 1572 / 3408;
-
-  /// Fraction down the image where its baked-in white area begins
-  /// (measured at y=1024 of the 3408-tall source).
   static const whiteStartFrac = 1024 / 3408;
 
   @override
@@ -354,11 +402,7 @@ class _CopyButtonState extends State<_CopyButton> {
         scale: _pressed ? 0.9 : 1.0,
         duration: const Duration(milliseconds: 140),
         curve: Curves.easeOut,
-        child: SvgPicture.asset(
-          'assets/icons/copy.svg',
-          width: 44,
-          height: 44,
-        ),
+        child: SvgPicture.asset('assets/icons/copy.svg', width: 44, height: 44),
       ),
     );
   }
