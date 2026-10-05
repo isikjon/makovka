@@ -96,7 +96,7 @@ class AppDrawer extends StatelessWidget {
               padding: EdgeInsets.only(bottom: 20),
               child: Center(
                 child: Text(
-                  'Версия 1.0.1',
+                  'Версия 1.0.2',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textMuted,

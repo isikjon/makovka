@@ -4,6 +4,7 @@ import '../api/auth_store.dart';
 import '../../features/welcome/welcome_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/auth/phone_auth_screen.dart';
+import '../../features/auth/otp_challenge.dart';
 import '../../features/auth/otp_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/shell/main_shell.dart';
@@ -84,10 +85,17 @@ class AppRouter {
       ),
       GoRoute(
         path: '/auth/otp',
-        pageBuilder: (context, state) => _fadeThroughPage(
-          state,
-          OtpScreen(phone: state.extra as String? ?? ''),
-        ),
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          return _fadeThroughPage(
+            state,
+            OtpScreen(
+              challenge: extra is OtpChallenge
+                  ? extra
+                  : const OtpChallenge(phone: ''),
+            ),
+          );
+        },
       ),
       GoRoute(
         path: '/auth/register',

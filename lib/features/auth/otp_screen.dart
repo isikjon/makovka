@@ -5,11 +5,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/auth_store.dart';
+import '../../core/content/json_values.dart';
 import '../../core/theme/app_theme.dart';
+import 'otp_challenge.dart';
 
 class OtpScreen extends StatefulWidget {
-  final String phone;
-  const OtpScreen({super.key, required this.phone});
+  final OtpChallenge challenge;
+  const OtpScreen({super.key, required this.challenge});
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -18,15 +20,17 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen>
     with SingleTickerProviderStateMixin {
   static const _designW = 393.0;
-  static const _codeLen = 6;
   static const _resendSeconds = 58;
 
   final _codeCtrl = TextEditingController();
   final _codeFocus = FocusNode();
 
+  late OtpChannel _channel = widget.challenge.channel;
+  late int _codeLen = widget.challenge.codeLength;
   Timer? _timer;
   int _secondsLeft = _resendSeconds;
   bool _verifying = false;
+  bool _requesting = false;
   String? _error;
 
   late final AnimationController _enter;
@@ -82,10 +86,12 @@ class _OtpScreenState extends State<OtpScreen>
       _error = null;
     });
     try {
-      final data = await ApiClient.instance.post(
-        '/auth/otp/verify',
-        body: {'phone': widget.phone, 'code': _codeCtrl.text},
-        auth: false,
+      final data = await guardRequest(
+        () => ApiClient.instance.post(
+          '/auth/otp/verify',
+          body: {'phone': widget.challenge.phone, 'code': _codeCtrl.text},
+          auth: false,
+        ),
       );
       await AuthStore.instance.setTokens(
         accessToken: data['access_token'] as String,
@@ -107,20 +113,43 @@ class _OtpScreenState extends State<OtpScreen>
 
   Future<void> _resend() async {
     if (_secondsLeft > 0) return;
+    await _requestCode(
+      channel: _channel == OtpChannel.call ? OtpChannel.call : null,
+    );
+  }
+
+  Future<void> _requestCall() => _requestCode(channel: OtpChannel.call);
+
+  Future<void> _requestCode({OtpChannel? channel}) async {
+    if (_requesting || _verifying) return;
+    final phone = widget.challenge.phone;
     _codeCtrl.clear();
-    setState(() => _error = null);
+    setState(() {
+      _requesting = true;
+      _error = null;
+    });
     try {
-      await ApiClient.instance.post(
-        '/auth/otp/request',
-        body: {'phone': widget.phone},
-        auth: false,
+      final data = await guardRequest(
+        () => ApiClient.instance.post(
+          '/auth/otp/request',
+          body: {'phone': phone, 'channel': ?channel?.name},
+          auth: false,
+        ),
       );
+      if (!mounted) return;
+      final challenge = OtpChallenge.fromResponse(phone, data);
+      setState(() {
+        _channel = challenge.channel;
+        _codeLen = challenge.codeLength;
+      });
+      _startTimer();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _requesting = false);
     }
-    _startTimer();
-    _codeFocus.requestFocus();
+    if (mounted) _codeFocus.requestFocus();
   }
 
   @override
@@ -142,7 +171,8 @@ class _OtpScreenState extends State<OtpScreen>
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final s = width / _designW;
-    final canResend = _secondsLeft == 0;
+    final canResend = _secondsLeft == 0 && !_requesting;
+    final isCall = _channel == OtpChannel.call;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF9F9),
@@ -177,7 +207,7 @@ class _OtpScreenState extends State<OtpScreen>
                         ),
                         SizedBox(height: 36 * s),
                         Text(
-                          'Вход в систему',
+                          isCall ? 'Вам поступит звонок' : 'Вход в систему',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.h1().copyWith(
                             fontSize: 24 * s,
@@ -188,7 +218,9 @@ class _OtpScreenState extends State<OtpScreen>
                         ),
                         SizedBox(height: 24 * s),
                         Text(
-                          'Введите код из SMS',
+                          isCall
+                              ? 'Введите последние 4 цифры номера, с которого звонят. Отвечать на звонок не нужно'
+                              : 'Введите код из SMS',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.body().copyWith(
                             fontSize: 14 * s,
@@ -201,6 +233,7 @@ class _OtpScreenState extends State<OtpScreen>
                           controller: _codeCtrl,
                           focusNode: _codeFocus,
                           length: _codeLen,
+                          locked: _requesting,
                           scale: s,
                         ),
                         if (_verifying) ...[
@@ -260,6 +293,17 @@ class _OtpScreenState extends State<OtpScreen>
                             ],
                           ),
                         ),
+                        if (!isCall) ...[
+                          SizedBox(height: 12 * s),
+                          Center(
+                            child: _SecondaryAction(
+                              text: 'Получить код звонком',
+                              enabled: !_requesting && !_verifying,
+                              onTap: _requestCall,
+                              scale: s,
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 32 * s),
                       ],
                     ),
@@ -306,12 +350,14 @@ class _CodeField extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final int length;
+  final bool locked;
   final double scale;
 
   const _CodeField({
     required this.controller,
     required this.focusNode,
     required this.length,
+    required this.locked,
     required this.scale,
   });
 
@@ -366,6 +412,8 @@ class _CodeField extends StatelessWidget {
               focusNode: focusNode,
               keyboardType: TextInputType.number,
               inputFormatters: [
+                if (locked)
+                  TextInputFormatter.withFunction((oldValue, _) => oldValue),
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(length),
               ],
@@ -381,6 +429,48 @@ class _CodeField extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SecondaryAction extends StatelessWidget {
+  final String text;
+  final bool enabled;
+  final VoidCallback onTap;
+  final double scale;
+  const _SecondaryAction({
+    required this.text,
+    required this.enabled,
+    required this.onTap,
+    required this.scale,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: enabled ? onTap : null,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: 12 * scale,
+          vertical: 8 * scale,
+        ),
+        child: AnimatedOpacity(
+          opacity: enabled ? 1 : 0.5,
+          duration: const Duration(milliseconds: 180),
+          child: Text(
+            text,
+            style: AppTextStyles.body().copyWith(
+              fontSize: 14 * scale,
+              height: 20 / 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.orange,
+              decoration: TextDecoration.underline,
+              decorationColor: AppColors.orange,
+            ),
+          ),
+        ),
       ),
     );
   }

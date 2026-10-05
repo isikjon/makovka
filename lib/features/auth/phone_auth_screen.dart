@@ -4,8 +4,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../../core/api/api_client.dart';
+import '../../core/content/json_values.dart';
 import '../../core/profile/profile_store.dart';
 import '../../core/theme/app_theme.dart';
+import 'otp_challenge.dart';
 
 class PhoneAuthScreen extends StatefulWidget {
   const PhoneAuthScreen({super.key});
@@ -69,16 +71,21 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen>
       _error = null;
     });
     try {
-      await ApiClient.instance.post(
-        '/auth/otp/request',
-        body: {'phone': phone},
-        auth: false,
+      final data = await guardRequest(
+        () => ApiClient.instance.post(
+          '/auth/otp/request',
+          body: {'phone': phone},
+          auth: false,
+        ),
       );
       ProfileStore.instance.save(
         ProfileStore.instance.data.copyWith(phone: phone),
       );
       if (!mounted) return;
-      context.go('/auth/otp', extra: phone);
+      context.go(
+        '/auth/otp',
+        extra: OtpChallenge.fromResponse(phone, data),
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
