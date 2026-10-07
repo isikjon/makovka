@@ -25,7 +25,6 @@ class _OtpScreenState extends State<OtpScreen>
   final _codeCtrl = TextEditingController();
   final _codeFocus = FocusNode();
 
-  late OtpChannel _channel = widget.challenge.channel;
   late int _codeLen = widget.challenge.codeLength;
   Timer? _timer;
   int _secondsLeft = _resendSeconds;
@@ -113,14 +112,10 @@ class _OtpScreenState extends State<OtpScreen>
 
   Future<void> _resend() async {
     if (_secondsLeft > 0) return;
-    await _requestCode(
-      channel: _channel == OtpChannel.call ? OtpChannel.call : null,
-    );
+    await _requestCode();
   }
 
-  Future<void> _requestCall() => _requestCode(channel: OtpChannel.call);
-
-  Future<void> _requestCode({OtpChannel? channel}) async {
+  Future<void> _requestCode() async {
     if (_requesting || _verifying) return;
     final phone = widget.challenge.phone;
     _codeCtrl.clear();
@@ -132,16 +127,13 @@ class _OtpScreenState extends State<OtpScreen>
       final data = await guardRequest(
         () => ApiClient.instance.post(
           '/auth/otp/request',
-          body: {'phone': phone, 'channel': ?channel?.name},
+          body: {'phone': phone, 'channel': 'call'},
           auth: false,
         ),
       );
       if (!mounted) return;
       final challenge = OtpChallenge.fromResponse(phone, data);
-      setState(() {
-        _channel = challenge.channel;
-        _codeLen = challenge.codeLength;
-      });
+      setState(() => _codeLen = challenge.codeLength);
       _startTimer();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -172,7 +164,6 @@ class _OtpScreenState extends State<OtpScreen>
     final width = MediaQuery.sizeOf(context).width;
     final s = width / _designW;
     final canResend = _secondsLeft == 0 && !_requesting;
-    final isCall = _channel == OtpChannel.call;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF9F9),
@@ -207,7 +198,7 @@ class _OtpScreenState extends State<OtpScreen>
                         ),
                         SizedBox(height: 36 * s),
                         Text(
-                          isCall ? 'Вам поступит звонок' : 'Вход в систему',
+                          'Вам поступит звонок',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.h1().copyWith(
                             fontSize: 24 * s,
@@ -218,9 +209,7 @@ class _OtpScreenState extends State<OtpScreen>
                         ),
                         SizedBox(height: 24 * s),
                         Text(
-                          isCall
-                              ? 'Введите последние 4 цифры номера, с которого звонят. Отвечать на звонок не нужно'
-                              : 'Введите код из SMS',
+                          'Введите последние 4 цифры номера, с которого звонят. Отвечать на звонок не нужно',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.body().copyWith(
                             fontSize: 14 * s,
@@ -270,11 +259,11 @@ class _OtpScreenState extends State<OtpScreen>
                         ),
                         SizedBox(height: 24 * s),
                         Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
                             children: [
                               Text(
-                                'Получить новый код: ',
+                                'Получить новый звонок: ',
                                 style: AppTextStyles.body().copyWith(
                                   fontSize: 14 * s,
                                   height: 20 / 14,
@@ -293,17 +282,6 @@ class _OtpScreenState extends State<OtpScreen>
                             ],
                           ),
                         ),
-                        if (!isCall) ...[
-                          SizedBox(height: 12 * s),
-                          Center(
-                            child: _SecondaryAction(
-                              text: 'Получить код звонком',
-                              enabled: !_requesting && !_verifying,
-                              onTap: _requestCall,
-                              scale: s,
-                            ),
-                          ),
-                        ],
                         SizedBox(height: 32 * s),
                       ],
                     ),
@@ -434,48 +412,6 @@ class _CodeField extends StatelessWidget {
   }
 }
 
-class _SecondaryAction extends StatelessWidget {
-  final String text;
-  final bool enabled;
-  final VoidCallback onTap;
-  final double scale;
-  const _SecondaryAction({
-    required this.text,
-    required this.enabled,
-    required this.onTap,
-    required this.scale,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: enabled ? onTap : null,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 12 * scale,
-          vertical: 8 * scale,
-        ),
-        child: AnimatedOpacity(
-          opacity: enabled ? 1 : 0.5,
-          duration: const Duration(milliseconds: 180),
-          child: Text(
-            text,
-            style: AppTextStyles.body().copyWith(
-              fontSize: 14 * scale,
-              height: 20 / 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.orange,
-              decoration: TextDecoration.underline,
-              decorationColor: AppColors.orange,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _ResendButton extends StatefulWidget {
   final bool enabled;
   final VoidCallback onTap;
@@ -523,7 +459,7 @@ class _ResendButtonState extends State<_ResendButton> {
           ),
           alignment: Alignment.center,
           child: Text(
-            'Получить код',
+            'Получить звонок',
             style: AppTextStyles.button().copyWith(
               fontSize: 18 * s,
               color: widget.enabled ? Colors.white : const Color(0xFFF3F1EF),

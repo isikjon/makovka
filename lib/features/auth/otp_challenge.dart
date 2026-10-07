@@ -1,10 +1,7 @@
-import '../../core/content/json_values.dart';
-
-enum OtpChannel { sms, call }
+enum OtpChannel { call }
 
 class OtpChallenge {
-  static const _defaultCodeLength = 6;
-  static const _maxCodeLength = 8;
+  static const _callCodeLength = 4;
 
   final String phone;
   final OtpChannel channel;
@@ -12,20 +9,18 @@ class OtpChallenge {
 
   const OtpChallenge({
     required this.phone,
-    this.channel = OtpChannel.sms,
-    this.codeLength = _defaultCodeLength,
+    this.channel = OtpChannel.call,
+    this.codeLength = _callCodeLength,
   });
 
   factory OtpChallenge.fromResponse(String phone, Map<String, dynamic> data) {
-    final length = jsonInt(data['code_length']);
     return OtpChallenge(
       phone: phone,
-      channel: jsonString(data['channel']) == OtpChannel.call.name
-          ? OtpChannel.call
-          : OtpChannel.sms,
-      codeLength: length > 0 && length <= _maxCodeLength
-          ? length
-          : _defaultCodeLength,
+      // The backend intentionally has one production authentication mode.
+      // Ignore legacy `channel=sms`/`code_length=6` responses from old
+      // sessions so the UI can never fall back to the retired flow.
+      channel: OtpChannel.call,
+      codeLength: _callCodeLength,
     );
   }
 }

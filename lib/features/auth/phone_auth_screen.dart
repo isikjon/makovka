@@ -74,7 +74,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen>
       final data = await guardRequest(
         () => ApiClient.instance.post(
           '/auth/otp/request',
-          body: {'phone': phone},
+          body: {'phone': phone, 'channel': 'call'},
           auth: false,
         ),
       );

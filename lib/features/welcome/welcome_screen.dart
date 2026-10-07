@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/auth_store.dart';
@@ -15,6 +17,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late final AnimationController _scaleCtrl;
   late final Animation<double> _fade;
   late final Animation<double> _scale;
+  Timer? _redirectTimer;
 
   @override
   void initState() {
@@ -35,7 +38,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _fadeCtrl.forward();
     _scaleCtrl.forward();
 
-    Future.delayed(const Duration(milliseconds: 2200), () {
+    _redirectTimer = Timer(const Duration(milliseconds: 2200), () {
       if (!mounted) return;
       context.go(AuthStore.instance.isAuthenticated ? '/home' : '/onboarding');
     });
@@ -43,6 +46,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   void dispose() {
+    _redirectTimer?.cancel();
     _fadeCtrl.dispose();
     _scaleCtrl.dispose();
     super.dispose();

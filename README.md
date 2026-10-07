@@ -1,16 +1,48 @@
-# makovka
+# Пекарня — Flutter-приложение
 
-A new Flutter project.
+Клиентское приложение программы лояльности пекарни под Android, iOS и Web/PWA.
+Backend находится в отдельном репозитории: [makovka_backend](https://github.com/isikjon/makovka_backend).
 
-## Getting Started
+## Возможности
 
-This project is a starting point for a Flutter application.
+- авторизация по номеру телефона;
+- вход кодом из звонка SMS.ru;
+- профиль пользователя;
+- QR-код карты гостя iiko;
+- персональная история покупок;
+- баланс, скидка и программа лояльности;
+- акции, новинки и персональные предложения;
+- карта пекарен;
+- реферальная программа;
+- Web/PWA-режим.
 
-A few resources to get you started if this is your first Flutter project:
+## Запуск
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+flutter pub get
+flutter run
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Для Web/PWA: `flutter run -d chrome`.
+
+## Проверка
+
+```bash
+flutter analyze
+flutter test
+```
+
+## Сборка Android
+
+```bash
+flutter build appbundle --release
+```
+
+Версия приложения задаётся в `pubspec.yaml`. Текущая версия — `1.0.2+3`.
+
+## История покупок
+
+Приложение не загружает общую историю всех покупателей заранее. После авторизации
+пользователь связывается с гостем iiko по номеру телефона, а backend получает
+транзакции этого гостя и возвращает их на экран истории. Реализация синхронизации,
+а также ограничения тестового контура описаны в README backend-репозитория.

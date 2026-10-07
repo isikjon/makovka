@@ -73,11 +73,11 @@ void main() {
     expect(call.channel, OtpChannel.call);
     expect(call.codeLength, 4);
     final fallback = OtpChallenge.fromResponse(_phone, {});
-    expect(fallback.channel, OtpChannel.sms);
-    expect(fallback.codeLength, 6);
+    expect(fallback.channel, OtpChannel.call);
+    expect(fallback.codeLength, 4);
   });
 
-  testWidgets('switches to call mode and submits four digits', (tester) async {
+  testWidgets('starts in call mode and submits four digits', (tester) async {
     final requests = <Map<String, dynamic>>[];
     final verifies = <Map<String, dynamic>>[];
     await _withScreen(tester, {
@@ -90,43 +90,34 @@ void main() {
         return _json({'detail': 'Неверный код'}, 400);
       },
     }, () async {
-      expect(find.text('Введите код из SMS'), findsOneWidget);
-      expect(_cells(tester).length, 6);
-
-      await tester.enterText(find.byType(TextField), '12');
-      await tester.tap(find.text('Получить код звонком'));
-      await _settle(tester);
-
-      expect(requests.single, {'phone': _phone, 'channel': 'call'});
       expect(find.text('Вам поступит звонок'), findsOneWidget);
-      expect(find.textContaining('последние 4 цифры'), findsOneWidget);
-      expect(find.text('Получить код звонком'), findsNothing);
       expect(_cells(tester).length, 4);
-      expect(_cells(tester).every((c) => c == '0'), isTrue);
-      expect(find.text('0:58'), findsOneWidget);
+      expect(find.textContaining('последние 4 цифры'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField), '4321');
       await _settle(tester);
 
       expect(verifies.single, {'phone': _phone, 'code': '4321'});
+      expect(requests, isEmpty);
       expect(find.text('Неверный код'), findsOneWidget);
     });
   });
 
-  testWidgets('shows backend error and stays in sms mode', (tester) async {
+  testWidgets('shows call request error and stays in call mode', (tester) async {
     await _withScreen(tester, {
       '/auth/otp/request': (_) =>
           _json({'detail': 'Не удалось отправить код: нет маршрута'}, 502),
     }, () async {
-      await tester.tap(find.text('Получить код звонком'));
+      await tester.pump(const Duration(seconds: 58));
+      await tester.tap(find.text('Получить звонок'));
       await _settle(tester);
 
       expect(
         find.text('Не удалось отправить код: нет маршрута'),
         findsOneWidget,
       );
-      expect(find.text('Введите код из SMS'), findsOneWidget);
-      expect(_cells(tester).length, 6);
+      expect(find.text('Вам поступит звонок'), findsOneWidget);
+      expect(_cells(tester).length, 4);
     });
   });
 
@@ -141,15 +132,15 @@ void main() {
       },
     }, () async {
       await tester.pump(const Duration(seconds: 57));
-      await tester.tap(find.text('Получить код'));
+      await tester.tap(find.text('Получить звонок'));
       await _settle(tester);
 
-      expect(requests.last, {'phone': _phone});
+      expect(requests.last, {'phone': _phone, 'channel': 'call'});
       expect(find.text('Вам поступит звонок'), findsOneWidget);
       expect(find.text('0:58'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 58));
-      await tester.tap(find.text('Получить код'));
+      await tester.tap(find.text('Получить звонок'));
       await _settle(tester);
 
       expect(requests.length, 2);
@@ -169,9 +160,10 @@ void main() {
         return _json({'detail': 'Неверный код'}, 400);
       },
     }, () async {
-      await tester.tap(find.text('Получить код звонком'));
+      await tester.pump(const Duration(seconds: 58));
+      await tester.tap(find.text('Получить звонок'));
       await _settle(tester);
-      await tester.enterText(find.byType(TextField), '123456');
+      await tester.enterText(find.byType(TextField), '1234');
       await tester.pump();
 
       expect(_cells(tester).every((c) => c == '0'), isTrue);
@@ -196,7 +188,7 @@ void main() {
     await _withScreen(tester, {
       '/auth/otp/verify': (_) => throw http.ClientException('offline'),
     }, () async {
-      await tester.enterText(find.byType(TextField), '123456');
+      await tester.enterText(find.byType(TextField), '1234');
       await _settle(tester);
 
       expect(find.textContaining('Нет соединения с сервером'), findsOneWidget);
